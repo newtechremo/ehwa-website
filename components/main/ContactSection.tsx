@@ -1,0 +1,56 @@
+"use client"
+
+export function ContactSection() {
+  return (
+    <section id="apply" className="section py-[60px] lg:py-[100px] border-b border-[#eee]">
+      <div className="container max-w-[1200px] mx-auto px-5">
+        <h2 className="sec-title text-[1.625rem] lg:text-[2.25rem] font-extrabold text-[#1a1a1a] mb-[50px] tracking-tight text-center">
+          서비스 신청 및 문의
+        </h2>
+
+        {/* 연락처 박스 - HTML과 동일한 구조 */}
+        <div className="contact-box bg-[#eaf3ed] p-[30px] lg:p-[60px] rounded-[24px] text-center border border-[rgba(0,76,40,0.1)]">
+          {/* CTA 버튼 그룹 */}
+          <div className="btn-group flex justify-center gap-[15px] flex-wrap">
+            <button
+              onClick={() => window.open("https://walla.my/a/barrierfree_v")}
+              className="btn-cta inline-flex items-center justify-center gap-2.5 bg-[#004c28] text-white py-[18px] px-[45px] rounded-[50px] text-[1.25rem] font-bold shadow-[0_10px_25px_rgba(0,76,40,0.25)] border-2 border-transparent transition-all hover:translate-y-[-4px] hover:shadow-[0_15px_30px_rgba(0,76,40,0.35)] hover:bg-[#00381e]"
+            >
+              편의지원 신청하기
+            </button>
+            <button
+              onClick={() => window.open("https://pf.kakao.com/_LKhxkn/chat")}
+              className="btn-cta kakao inline-flex items-center justify-center gap-2.5 bg-[#FEE500] text-[#3c1e1e] py-[18px] px-[45px] rounded-[50px] text-[1.25rem] font-bold shadow-[0_10px_25px_rgba(254,229,0,0.4)] border-2 border-transparent transition-all hover:translate-y-[-4px] hover:bg-[#fadd00]"
+            >
+              카카오톡 문의
+            </button>
+          </div>
+
+          {/* 신청 후 진행과정 안내 */}
+          <div className="apply-process my-[25px] mx-auto text-left max-w-[600px] text-base text-[#1a1a1a]">
+            <p className="my-1"><strong>신청 후 진행과정</strong></p>
+            <p className="my-1">1. 전화 연락 – 신청하시면 담당 직원이 평일 기준 2일 내 전화를 드립니다.</p>
+            <p className="my-1">2. 이용 확정 – (영상)전화 상담 후 서비스 이용이 최종 확정됩니다.</p>
+          </div>
+
+          {/* 연락처 정보 */}
+          <div className="contact-info mt-[40px] mx-auto text-lg max-w-[600px] bg-white p-[30px] rounded-2xl shadow-[0_5px_15px_rgba(0,0,0,0.05)] text-left">
+            <div className="info-row flex mb-[15px] items-center">
+              <span className="info-label w-[100px] font-bold text-[#4a4a4a]">전화</span>
+              <span className="info-val font-semibold text-[#333] text-lg">02-2650-5586</span>
+            </div>
+            <div className="info-row flex mb-[15px] items-center">
+              <span className="info-label w-[100px] font-bold text-[#4a4a4a]">이메일</span>
+              <span className="info-val font-semibold text-[#333] text-lg">eumc.barrierfree@gmail.com</span>
+            </div>
+            <div className="info-row flex mb-[15px] items-center">
+              <span className="info-label w-[100px] font-bold text-[#4a4a4a]">운영시간</span>
+              <span className="info-val font-semibold text-[#333] text-lg">평일 09:00 ~ 17:00 (점심시간 12:00 ~ 13:00)</span>
+            </div>
+            <p className="mt-[10px] text-sm text-[#666]">※ 토요일 진료는 사전 예약 시에만 지원 가능합니다.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}

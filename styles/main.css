@@ -1,0 +1,778 @@
+/* 메인 페이지 전용 스타일 */
+
+/* 접근성 포커스 스타일 개선 */
+*:focus-visible {
+  outline: 3px solid #ffd700;
+  outline-offset: 2px;
+  z-index: 9999;
+}
+
+/* 기본 스크롤 동작 */
+html {
+  scroll-behavior: smooth;
+  transition: font-size 0.2s ease;
+}
+
+/* 페이지 전환 애니메이션 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-fade-in {
+  animation: fadeIn 0.4s ease-out;
+}
+
+/* 히어로 슬라이드 전환 */
+.slide-transition {
+  transition: opacity 1s ease-in-out;
+}
+
+/* 수어 영상 컨테이너 애니메이션 */
+.sign-container {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  margin-top: 0;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sign-container.visible {
+  max-height: 600px;
+  opacity: 1;
+  margin-top: 30px;
+}
+
+/* 모바일 메뉴 드로어 */
+.mobile-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 2400;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s;
+}
+
+.mobile-menu-overlay.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.mobile-menu-wrap {
+  position: fixed;
+  top: 0;
+  right: -100%;
+  width: 85%;
+  max-width: 320px;
+  height: 100%;
+  background: #fff;
+  z-index: 2500;
+  padding: 25px;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -5px 0 20px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-menu-wrap.open {
+  right: 0;
+}
+
+/* 팝업 모달 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 3000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s;
+  padding: 20px;
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.modal-wrap {
+  background: #fff;
+  width: 100%;
+  max-width: 800px;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: 90vh;
+  transform: translateY(20px);
+  transition: transform 0.3s;
+}
+
+.modal-overlay.active .modal-wrap {
+  transform: translateY(0);
+}
+
+/* =====================================================
+   [★ 저시력 모드 스타일 - 고대비]
+   원본 HTML(251223)과 완전 동일하게 적용
+   ===================================================== */
+body.low-vision {
+  background-color: #000 !important;
+  color: #fff !important;
+  zoom: 1.2;
+}
+
+body.low-vision * {
+  border-color: #00ffff !important;
+  box-shadow: none !important;
+}
+
+/* 회색 계열 텍스트 -> 흰색으로 강제 변경 (HTML과 동일) */
+body.low-vision .sec-desc,
+body.low-vision .intro-text,
+body.low-vision .step-desc,
+body.low-vision .faq-content,
+body.low-vision .info-label,
+body.low-vision .info-val,
+body.low-vision .feat-date,
+body.low-vision footer,
+body.low-vision p,
+body.low-vision span,
+body.low-vision div,
+body.low-vision .apply-process,
+body.low-vision .modal-meta,
+body.low-vision .modal-body {
+  color: #fff !important;
+}
+
+/* 활성화된 버튼의 텍스트와 테두리를 노란색으로 변경 */
+body.low-vision .a11y-btn.active,
+body.low-vision [aria-pressed="true"] {
+  background-color: #000 !important;
+  color: #ffe812 !important;
+  border: 2px solid #ffe812 !important;
+}
+
+body.low-vision .a11y-btn.active i,
+body.low-vision .a11y-btn.active span,
+body.low-vision .a11y-btn.active .emoji-icon,
+body.low-vision [aria-pressed="true"] *,
+body.low-vision .active * {
+  color: #ffe812 !important;
+}
+
+/* 배경 검은색으로 변경할 요소들 (HTML과 동일) */
+body.low-vision header,
+body.low-vision .hero,
+body.low-vision .step-item,
+body.low-vision details,
+body.low-vision .feat-card,
+body.low-vision .support-card,
+body.low-vision .contact-box,
+body.low-vision .contact-info,
+body.low-vision .intro-box,
+body.low-vision .target-item,
+body.low-vision .mob-list-item,
+body.low-vision .mobile-menu-wrap,
+body.low-vision .blog-list-table th,
+body.low-vision .blog-list-table td,
+body.low-vision .faq-content,
+body.low-vision .sign-lang-container,
+body.low-vision .modal-wrap,
+body.low-vision .modal-header,
+body.low-vision .modal-file-box,
+body.low-vision section,
+body.low-vision footer,
+body.low-vision nav,
+body.low-vision main,
+body.low-vision summary,
+body.low-vision table,
+body.low-vision thead,
+body.low-vision tbody,
+body.low-vision tr {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+/* 히어로 오버레이 더 어둡게 */
+body.low-vision .hero-overlay {
+  background: rgba(0, 0, 0, 0.8) !important;
+}
+
+/* 강조색(노랑) 적용 대상 (HTML과 동일) */
+body.low-vision h1,
+body.low-vision h2,
+body.low-vision h3,
+body.low-vision h4,
+body.low-vision .logo,
+body.low-vision a,
+body.low-vision .faq-q,
+body.low-vision .step-num,
+body.low-vision .intro-sub-title,
+body.low-vision .target-icon,
+body.low-vision .gnb-precheck-btn,
+body.low-vision .modal-title,
+body.low-vision .file-name,
+body.low-vision .gnb-pc button {
+  color: #f7ed72 !important;
+}
+
+/* GNB 네비게이션 버튼 (고대비 모드) - HTML과 동일 */
+body.low-vision .gnb-pc button {
+  background: transparent !important;
+  color: #f7ed72 !important;
+  font-size: 1.125rem !important;
+  font-weight: 700 !important;
+}
+
+body.low-vision .gnb-pc button span {
+  background: #f7ed72 !important;
+}
+
+/* 로고 버튼 (고대비 모드) - HTML과 동일 */
+body.low-vision button.logo {
+  color: #f7ed72 !important;
+}
+
+body.low-vision button.logo i {
+  color: #f7ed72 !important;
+}
+
+/* FAQ 배지, 모달 배지 */
+body.low-vision .faq-badge,
+body.low-vision .modal-badge {
+  background: #000 !important;
+  color: #f7ed72 !important;
+  border: 1px solid #00ffff !important;
+}
+
+/* CTA 버튼, 파일 다운로드 버튼, 닫기 버튼 */
+body.low-vision .btn-cta,
+body.low-vision .btn-file-down,
+body.low-vision .btn-close-modal {
+  background: #000 !important;
+  color: #f7ed72 !important;
+  border: 2px solid #00ffff !important;
+}
+
+/* 사전문진표 버튼 */
+body.low-vision .gnb-precheck-btn {
+  background: #000 !important;
+  border: 1px solid #f7ed72 !important;
+}
+
+/* 접근성 도구 바 버튼 */
+body.low-vision .a11y-btn,
+body.low-vision .font-control-group {
+  border: 1px solid #fff !important;
+}
+
+/* =====================================================
+   모바일 메뉴 고대비 스타일 (HTML 251223과 동일)
+   ===================================================== */
+
+/* 모바일 메뉴 배경 */
+body.low-vision .mobile-menu-wrap {
+  background: #000 !important;
+}
+
+/* 모바일 메뉴 타이틀 */
+body.low-vision .mobile-menu-wrap .font-extrabold,
+body.low-vision .mobile-menu-wrap .m-menu-title {
+  color: #f7ed72 !important;
+}
+
+/* 모바일 메뉴 닫기 버튼 */
+body.low-vision .mobile-menu-wrap button[aria-label="메뉴 닫기"] {
+  color: #fff !important;
+}
+
+/* 모바일 메뉴 네비게이션 링크/버튼 - 핵심 수정 */
+body.low-vision .mobile-menu-wrap ul li button,
+body.low-vision .mobile-menu-wrap .mobile-gnb a {
+  color: #f7ed72 !important;
+  background: #000 !important;
+  border-color: #00ffff !important;
+}
+
+/* 모바일 메뉴 화살표 아이콘 */
+body.low-vision .mobile-menu-wrap ul li button svg,
+body.low-vision .mobile-menu-wrap .mobile-gnb a::after {
+  color: #00ffff !important;
+}
+
+/* 모바일 사전문진표 버튼 */
+body.low-vision .mobile-menu-wrap ul li a[aria-label*="사전문진표"],
+body.low-vision .mobile-menu-wrap .mobile-gnb a.precheck {
+  background: #000 !important;
+  color: #f7ed72 !important;
+  border: 2px solid #00ffff !important;
+}
+
+/* 모바일 메뉴 하단 문의전화 */
+body.low-vision .mobile-menu-wrap .mt-auto p {
+  color: #fff !important;
+}
+
+body.low-vision .mobile-menu-wrap .mt-auto p strong {
+  color: #fff !important;
+}
+
+body.low-vision .mobile-menu-wrap .mt-auto p span {
+  color: #f7ed72 !important;
+}
+
+/* 햄버거 버튼 */
+body.low-vision button[aria-label="메뉴 열기"] {
+  color: #f7ed72 !important;
+}
+
+/* 입력 필드 */
+body.low-vision input,
+body.low-vision textarea,
+body.low-vision select {
+  background: #000 !important;
+  color: #fff !important;
+  border: 1px solid #00ffff !important;
+}
+
+/* 테이블 스타일 */
+body.low-vision table th {
+  background: #111 !important;
+  color: #f7ed72 !important;
+}
+
+body.low-vision table td {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+/* 스크롤바 스타일 */
+body.low-vision ::-webkit-scrollbar {
+  background: #000;
+}
+
+body.low-vision ::-webkit-scrollbar-thumb {
+  background: #00ffff;
+}
+
+/* Botpress 챗봇 버튼 */
+body.low-vision #bp-web-widget-container,
+body.low-vision .bpw-floating-button {
+  border: 2px solid #00ffff !important;
+}
+
+/* =====================================================
+   [일반 스타일]
+   ===================================================== */
+
+/* 수어 영상 컨테이너 (HTML과 동일) */
+.sign-lang-container {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  margin-top: 0;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 16px;
+  background: #000;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+  border: 1px solid #ddd;
+}
+
+.sign-lang-container.visible {
+  max-height: 600px;
+  opacity: 1;
+  margin-top: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+/* 수어 영상 내부 구조 (HTML과 동일) */
+.sign-video-placeholder {
+  width: 100%;
+  height: 0;
+  padding-bottom: 56.25%;
+  position: relative;
+  background: #000;
+}
+
+.sign-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.sign-emoji {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-size: 1.875rem;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* FAQ 아코디언 (HTML과 동일) */
+details {
+  border: 1px solid #e1e1e1;
+  border-radius: 12px;
+  margin-bottom: 15px;
+  background: #fff;
+  transition: all 0.3s;
+}
+
+details[open] {
+  border-color: #004c28;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+}
+
+summary {
+  padding: 25px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 1.125rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  list-style: none;
+  color: #333;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+summary::after {
+  content: "\f078";
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  font-size: 0.875rem;
+  transition: transform 0.3s;
+  color: #999;
+}
+
+details[open] summary::after {
+  transform: rotate(180deg);
+  color: #004c28;
+}
+
+.faq-content {
+  padding: 0 25px 30px 25px;
+  font-size: 1.125rem;
+  line-height: 1.7;
+  background: #fff;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+  color: #555;
+}
+
+.faq-q {
+  color: #004c28;
+  margin-right: 12px;
+  font-weight: 900;
+}
+
+.faq-badge {
+  display: inline-block;
+  background: #eaf3ed;
+  color: #004c28;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  margin-right: 8px;
+  vertical-align: 2px;
+  border: 1px solid rgba(0, 76, 40, 0.1);
+}
+
+/* 사전문진표 버튼 (HTML과 동일) */
+.gnb-precheck-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 44px;
+  padding-left: 34px;
+  padding-right: 34px;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--primary) !important;
+  border: 1.5px solid var(--primary);
+  font-size: 1rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.gnb-precheck-btn i {
+  font-size: 0.875rem;
+  margin-left: 4px;
+}
+
+.gnb-precheck-btn span {
+  margin-right: 4px;
+}
+
+.gnb-precheck-btn:hover {
+  background: var(--primary);
+  color: #fff !important;
+}
+
+/* FAQ 아코디언 화살표 회전 */
+details[open] summary .faq-arrow {
+  transform: rotate(180deg);
+}
+
+/* 숨김 텍스트 (스크린 리더용) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* 프로스 스타일 (에디터 콘텐츠) */
+.prose-content p {
+  margin-bottom: 10px;
+}
+
+.prose-content img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+/* 카드 호버 효과 */
+.card-hover {
+  transition:
+    transform 0.3s,
+    box-shadow 0.3s;
+}
+
+.card-hover:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+}
+
+/* 스텝 아이템 호버 */
+.step-hover {
+  transition: transform 0.3s;
+}
+
+.step-hover:hover {
+  transform: translateY(-5px);
+}
+
+/* 버튼 호버 효과 */
+.btn-cta-hover {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.btn-cta-hover:hover {
+  transform: translateY(-4px);
+}
+
+/* =====================================================
+   [헤더 & GNB 반응형 - 글자 크기 변경 대응]
+   ===================================================== */
+
+/* 기본 헤더 스타일 */
+.header-main {
+  min-height: 80px;
+}
+
+/* GNB PC 메뉴 */
+.gnb-pc {
+  transition: gap 0.2s ease;
+}
+
+/* 글자 크기가 커질 때 gap 조절 */
+html[style*="font-size: 125%"] .gnb-pc,
+html[style*="font-size: 150%"] .gnb-pc {
+  gap: 1rem !important;
+}
+
+html[style*="font-size: 150%"] .gnb-pc {
+  gap: 0.75rem !important;
+}
+
+/* 글자 크기가 커질 때 로고 텍스트 크기 조절 */
+html[style*="font-size: 125%"] .header-main button[class*="text-[1.375rem]"],
+html[style*="font-size: 150%"] .header-main button[class*="text-[1.375rem]"] {
+  font-size: 1.125rem;
+}
+
+/* 글자 크기가 커질 때 네비게이션 버튼 크기 조절 */
+html[style*="font-size: 125%"] .gnb-pc button,
+html[style*="font-size: 125%"] .gnb-pc a {
+  font-size: 1rem;
+  padding: 0.5rem 0;
+}
+
+html[style*="font-size: 150%"] .gnb-pc button,
+html[style*="font-size: 150%"] .gnb-pc a {
+  font-size: 0.9375rem;
+  padding: 0.375rem 0;
+}
+
+/* 사전문진표 버튼 크기 조절 */
+html[style*="font-size: 125%"] .gnb-pc a[class*="rounded-md"] {
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+}
+
+html[style*="font-size: 150%"] .gnb-pc a[class*="rounded-md"] {
+  padding: 0.375rem 1rem;
+  font-size: 0.8125rem;
+}
+
+/* 반응형 스타일 */
+@media (max-width: 1024px) {
+  /* 히어로 섹션 모바일 */
+  .hero {
+    padding: 100px 20px 80px;
+  }
+
+  .hero h1 {
+    font-size: 2rem;
+  }
+
+  .hero p {
+    font-size: 1.125rem;
+  }
+
+  /* 버튼 그룹 모바일 */
+  .btn-group {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .btn-cta {
+    width: 100%;
+    max-width: 300px;
+    padding: 16px 30px;
+    font-size: 1.125rem;
+  }
+
+  /* 스텝 리스트 모바일 */
+  .step-list {
+    flex-direction: column;
+  }
+
+  /* 지원 그리드 모바일 */
+  .support-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* 대상자 리스트 모바일 */
+  .target-list {
+    flex-direction: column;
+  }
+
+  /* 연락처 박스 모바일 */
+  .contact-box {
+    padding: 30px 20px;
+  }
+
+  .contact-info {
+    padding: 20px;
+  }
+
+  /* 모바일에서 테이블 숨김 */
+  .hide-mobile-table {
+    display: none;
+  }
+
+  /* 모바일에서 리스트 표시 */
+  .show-mobile-list {
+    display: block;
+  }
+
+  /* 모바일 카드 스크롤 */
+  .mobile-scroll {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 20px;
+    gap: 15px;
+  }
+
+  .mobile-scroll > * {
+    min-width: 280px;
+    scroll-snap-align: start;
+  }
+
+  /* 모달 모바일 */
+  .modal-wrap {
+    max-height: 95vh;
+    border-radius: 12px;
+  }
+
+  /* 주요 소식 그리드 모바일 */
+  .blog-featured {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 1025px) {
+  .hide-mobile-table {
+    display: table;
+  }
+
+  .show-mobile-list {
+    display: none;
+  }
+
+  /* 스텝 리스트 PC */
+  .step-list {
+    display: flex;
+    gap: 25px;
+  }
+
+  /* 지원 그리드 PC */
+  .support-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+
+  /* 대상자 리스트 PC */
+  .target-list {
+    display: flex;
+    gap: 20px;
+  }
+}
