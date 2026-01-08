@@ -8,8 +8,8 @@ export const runtime = "nodejs"
 export const maxDuration = 60
 export const fetchCache = "force-no-store"
 
-// 본문 크기 제한 (25MB) - Next.js 14.2+ App Router
-export const bodySizeLimit = "25mb"
+// 본문 크기 제한 (100MB) - Next.js 14.2+ App Router
+export const bodySizeLimit = "100mb"
 
 const dataFilePath = path.join(process.cwd(), "data", "posts.json")
 

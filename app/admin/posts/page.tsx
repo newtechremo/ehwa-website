@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, ChevronRight, Search } from "lucide-react"
+import { Plus, ChevronRight, ChevronLeft, Search } from "lucide-react"
 import Link from "next/link"
 
 type Post = {
@@ -71,6 +71,8 @@ export default function PostsListPage() {
   const [categoryFilter, setCategoryFilter] = useState("전체")
   const [statusFilter, setStatusFilter] = useState("전체")
   const [searchQuery, setSearchQuery] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 10
 
   useEffect(() => {
     const loadPosts = async () => {
@@ -106,7 +108,14 @@ export default function PostsListPage() {
     }
 
     setFilteredPosts(filtered)
+    setCurrentPage(1) // 필터 변경 시 첫 페이지로 이동
   }, [categoryFilter, statusFilter, searchQuery, posts])
+
+  // 페이지네이션 계산
+  const totalPages = Math.ceil(filteredPosts.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedPosts = filteredPosts.slice(startIndex, endIndex)
 
   const toggleStatus = async (id: number) => {
     const post = posts.find((p) => p.id === id)
@@ -207,16 +216,16 @@ export default function PostsListPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredPosts.length === 0 ? (
+              {paginatedPosts.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                     게시글이 없습니다.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredPosts.map((post, index) => (
+                paginatedPosts.map((post, index) => (
                   <TableRow key={post.id}>
-                    <TableCell className="font-medium">{filteredPosts.length - index}</TableCell>
+                    <TableCell className="font-medium">{filteredPosts.length - startIndex - index}</TableCell>
                     <TableCell>
                       <Switch checked={post.status} onCheckedChange={() => toggleStatus(post.id)} />
                     </TableCell>
@@ -225,7 +234,11 @@ export default function PostsListPage() {
                         {post.category}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-medium">{post.title}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link href={`/admin/posts/${post.id}`} className="hover:text-primary hover:underline cursor-pointer">
+                        {post.title}
+                      </Link>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {new Date(post.publishedAt).toLocaleString("ko-KR")}
                     </TableCell>
@@ -243,6 +256,50 @@ export default function PostsListPage() {
             </TableBody>
           </Table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4">
+            <p className="text-sm text-muted-foreground">
+              총 {filteredPosts.length}개 중 {startIndex + 1}-{Math.min(endIndex, filteredPosts.length)}개 표시
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="gap-1"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                이전
+              </Button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(page)}
+                    className="w-8 h-8 p-0"
+                  >
+                    {page}
+                  </Button>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="gap-1"
+              >
+                다음
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
