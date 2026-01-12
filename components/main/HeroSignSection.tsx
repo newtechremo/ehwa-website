@@ -31,9 +31,6 @@ export function HeroSignSection({ signLanguageEnabled }: HeroSignSectionProps) {
         <div className="sign-lang-container visible">
           <div className="sign-video-placeholder">
             <div className="sign-content">
-              <span className="sign-emoji">
-                <SignLanguageIcon />
-              </span>
               <iframe
                 src="https://www.youtube.com/embed/bG0kC10NdRs?si=2hOHCSzZvLTZNf3W&mute=1"
                 title="메인 인사말 수어 해설 영상"

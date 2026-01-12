@@ -58,9 +58,6 @@ export function StepsSection({ signLanguageEnabled }: StepsSectionProps) {
           >
             <div className="sign-video-placeholder">
               <div className="sign-content">
-                <span className="sign-emoji">
-                  <SignLanguageIcon />
-                </span>
                 <iframe
                   src="https://www.youtube.com/embed/Ah0GHfdMBeY?si=VENUwhk4zhGpl12Z&mute=1"
                   title="이용방법 수어 해설 영상"

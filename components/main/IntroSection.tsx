@@ -84,9 +84,6 @@ export function IntroSection({ signLanguageEnabled }: IntroSectionProps) {
           >
             <div className="sign-video-placeholder">
               <div className="sign-content">
-                <span className="sign-emoji">
-                  <SignLanguageIcon />
-                </span>
                 <iframe
                   src="https://www.youtube.com/embed/ArvQ4IZTbq8?si=x22JycVyHbd2JNmV&mute=1"
                   title="사업 소개 수어 해설 영상"

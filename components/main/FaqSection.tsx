@@ -65,9 +65,6 @@ export function FaqSection({ signLanguageEnabled }: FaqSectionProps) {
           >
             <div className="sign-video-placeholder">
               <div className="sign-content">
-                <span className="sign-emoji">
-                  <SignLanguageIcon />
-                </span>
                 <iframe
                   src="https://www.youtube.com/embed/CRQK4E51pN0?si=4cZZOKMCRskGWVbq"
                   title="FAQ 수어 해설 영상"
