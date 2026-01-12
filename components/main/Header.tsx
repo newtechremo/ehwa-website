@@ -45,14 +45,22 @@ export function Header({ currentPage, currentSection, onNavigateMain, onNavigate
     <>
       {/* 헤더 */}
       <header className="header-main border-b border-[#e1e1e1] bg-white min-h-[80px] flex items-center relative z-[1500] shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
-        <div className="w-full max-w-[1200px] mx-auto px-5 py-3 flex justify-between items-center flex-wrap gap-y-2">
+        <div className="w-full max-w-[1200px] mx-auto px-5 py-3 flex justify-between items-center">
           {/* 로고 */}
           <button
             onClick={() => handleNavClick("hero")}
-            className="logo text-[1.375rem] font-extrabold text-[#004c28] tracking-tight flex items-center gap-2"
+            className="logo text-[1.375rem] font-extrabold text-[#004c28] tracking-tight flex items-center gap-2 flex-1 lg:flex-none"
           >
-            <img src="/logo_ehwa.svg" alt="이대목동병원 로고" className="h-8 w-auto" />
-            이대목동병원 장애인 이용편의 지원센터
+            <img src="/logo_ehwa.svg" alt="이대목동병원 로고" className="h-8 w-auto flex-shrink-0" />
+            <span className="flex flex-wrap">
+              <span className="whitespace-nowrap">이대목동병원</span>
+              <span className="whitespace-nowrap">&nbsp;장애인 이용편의 지원센터</span>
+            </span>
+          </button>
+
+          {/* 모바일 햄버거 버튼 */}
+          <button className="lg:hidden text-[1.625rem] text-[#333] p-2.5 flex-shrink-0" onClick={openMenu} aria-label="메뉴 열기">
+            <Menu />
           </button>
 
           {/* PC 네비게이션 */}
@@ -109,11 +117,6 @@ export function Header({ currentPage, currentSection, onNavigateMain, onNavigate
               <span className="mr-1">사전문진표</span>
             </a>
           </nav>
-
-          {/* 모바일 햄버거 버튼 */}
-          <button className="lg:hidden text-[1.625rem] text-[#333] p-2.5" onClick={openMenu} aria-label="메뉴 열기">
-            <Menu />
-          </button>
         </div>
       </header>
 

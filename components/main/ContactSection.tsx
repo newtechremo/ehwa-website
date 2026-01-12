@@ -28,17 +28,23 @@ export function ContactSection() {
 
           {/* 연락처 정보 */}
           <div className="contact-info mt-[40px] mx-auto text-lg max-w-[600px] bg-white p-[30px] rounded-2xl shadow-[0_5px_15px_rgba(0,0,0,0.05)] text-left">
-            <div className="info-row flex mb-[15px] items-center">
-              <span className="info-label w-[100px] font-bold text-[#4a4a4a]">전화</span>
-              <span className="info-val font-semibold text-[#333] text-lg">02-2650-5586</span>
+            <div className="info-row flex flex-col sm:flex-row mb-[15px] sm:items-center gap-1 sm:gap-0">
+              <span className="info-label w-auto sm:w-[100px] font-bold text-[#4a4a4a] whitespace-nowrap">전화</span>
+              <span className="info-val font-semibold text-[#333] text-lg break-keep">02-2650-5586</span>
             </div>
-            <div className="info-row flex mb-[15px] items-center">
-              <span className="info-label w-[100px] font-bold text-[#4a4a4a]">이메일</span>
-              <span className="info-val font-semibold text-[#333] text-lg">eumc.barrierfree@gmail.com</span>
+            <div className="info-row flex flex-col sm:flex-row mb-[15px] sm:items-center gap-1 sm:gap-0">
+              <span className="info-label w-auto sm:w-[100px] font-bold text-[#4a4a4a] whitespace-nowrap">이메일</span>
+              <span className="info-val font-semibold text-[#333] text-lg flex flex-wrap">
+                <span className="whitespace-nowrap">eumc.barrierfree</span>
+                <span className="whitespace-nowrap">@gmail.com</span>
+              </span>
             </div>
-            <div className="info-row flex mb-[15px] items-center">
-              <span className="info-label w-[100px] font-bold text-[#4a4a4a]">운영시간</span>
-              <span className="info-val font-semibold text-[#333] text-lg">평일 09:00 ~ 17:00 (점심시간 12:00 ~ 13:00)</span>
+            <div className="info-row flex flex-col sm:flex-row mb-[15px] sm:items-center gap-1 sm:gap-0">
+              <span className="info-label w-auto sm:w-[100px] font-bold text-[#4a4a4a] whitespace-nowrap">운영시간</span>
+              <span className="info-val font-semibold text-[#333] text-lg flex flex-wrap">
+                <span className="whitespace-nowrap">평일 09:00 ~ 17:00</span>
+                <span className="whitespace-nowrap">&nbsp;(점심시간 12:00 ~ 13:00)</span>
+              </span>
             </div>
           </div>
         </div>

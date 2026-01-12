@@ -63,7 +63,7 @@ export function HeroSection() {
           <br />
           동행하겠습니다
         </h1>
-        <p className="text-[1.125rem] lg:text-[1.375rem] text-[#eee] mb-[50px] font-medium">
+        <p className="text-[1.125rem] lg:text-[1.375rem] text-[#eee] mb-[50px] font-medium break-keep">
           장벽 없는 병원 이용,
           <br />
           장애인 의료기관 이용편의 지원사업과 함께라면 가능합니다.
