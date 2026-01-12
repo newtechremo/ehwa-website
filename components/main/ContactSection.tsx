@@ -41,9 +41,9 @@ export function ContactSection() {
             </div>
             <div className="info-row flex flex-col sm:flex-row mb-[15px] sm:items-center gap-1 sm:gap-0">
               <span className="info-label w-auto sm:w-[100px] font-bold text-[#4a4a4a] whitespace-nowrap">운영시간</span>
-              <span className="info-val font-semibold text-[#333] text-lg flex flex-wrap">
-                <span className="whitespace-nowrap">평일 09:00 ~ 17:00</span>
-                <span className="whitespace-nowrap">&nbsp;(점심시간 12:00 ~ 13:00)</span>
+              <span className="info-val font-semibold text-[#333] text-lg flex flex-wrap break-keep">
+                <span>평일 09:00 ~ 17:00</span>
+                <span>&nbsp;(점심시간 12:00 ~ 13:00)</span>
               </span>
             </div>
           </div>
