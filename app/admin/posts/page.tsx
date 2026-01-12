@@ -155,7 +155,7 @@ export default function PostsListPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">사업소식 게시글 관리</h1>
+            <h1 className="text-3xl font-bold text-foreground">알림/소식 게시글 관리</h1>
             <p className="text-muted-foreground mt-1">공지 · 행사 · 뉴스 게시글을 관리합니다.</p>
           </div>
           <Link href="/admin/posts/write">

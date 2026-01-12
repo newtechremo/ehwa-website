@@ -16,7 +16,7 @@ export function ContactSection() {
               onClick={() => window.open("https://walla.my/a/barrierfree_v")}
               className="btn-cta inline-flex items-center justify-center gap-2.5 bg-[#004c28] text-white py-[18px] px-[45px] rounded-[50px] text-[1.25rem] font-bold shadow-[0_10px_25px_rgba(0,76,40,0.25)] border-2 border-transparent transition-all hover:translate-y-[-4px] hover:shadow-[0_15px_30px_rgba(0,76,40,0.35)] hover:bg-[#00381e]"
             >
-              편의지원 신청하기
+              서비스 신청하기
             </button>
             <button
               onClick={() => window.open("https://pf.kakao.com/_LKhxkn/chat")}
@@ -24,13 +24,6 @@ export function ContactSection() {
             >
               카카오톡 문의
             </button>
-          </div>
-
-          {/* 신청 후 진행과정 안내 */}
-          <div className="apply-process my-[25px] mx-auto text-left max-w-[600px] text-base text-[#1a1a1a]">
-            <p className="my-1"><strong>신청 후 진행과정</strong></p>
-            <p className="my-1">1. 전화 연락 – 신청하시면 담당 직원이 평일 기준 2일 내 전화를 드립니다.</p>
-            <p className="my-1">2. 이용 확정 – (영상)전화 상담 후 서비스 이용이 최종 확정됩니다.</p>
           </div>
 
           {/* 연락처 정보 */}
@@ -47,7 +40,6 @@ export function ContactSection() {
               <span className="info-label w-[100px] font-bold text-[#4a4a4a]">운영시간</span>
               <span className="info-val font-semibold text-[#333] text-lg">평일 09:00 ~ 17:00 (점심시간 12:00 ~ 13:00)</span>
             </div>
-            <p className="mt-[10px] text-sm text-[#666]">※ 토요일 진료는 사전 예약 시에만 지원 가능합니다.</p>
           </div>
         </div>
       </div>

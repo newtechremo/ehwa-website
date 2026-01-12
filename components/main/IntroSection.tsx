@@ -38,25 +38,25 @@ const supportServices = [
   {
     icon: "fa-solid fa-person-walking",
     title: "이동 · 동행 지원",
-    description: "혼자 이동하기 힘드신 경우 직원이 밀착 동행합니다. 휠체어 이용, 환복, 검사 중 자세 유지 등 신체적 보조를 지원합니다.",
+    description: "혼자 이동하기 어려울 때 동행합니다.\n휠체어 이용, 환복, 검사 중 자세 유지 등 신체 활동을 지원합니다.",
     useSignIcon: false,
   },
   {
     icon: "",
     title: "의사소통 지원",
-    description: "전문 수어통역사가 진료 전 과정을 통역합니다. 글자판(필담), 그림판(AAC) 등을 활용해 정확한 의사소통을 돕습니다.",
+    description: "수어통역이 필요할 때, 원내 전담 수어통역사가 전 진료 과정을 함께합니다.\n글자판(필담), 그림판(ACC) 등 다양한 의사소통 방식을 활용합니다.",
     useSignIcon: true,
   },
   {
     icon: "fa-solid fa-file-signature",
     title: "행정절차 지원",
-    description: "키오스크(무인기기) 사용이나 복잡한 서류 작성을 곁에서 도와드립니다. 필요 시 지역사회 내 복지 자원으로 연계해 드립니다.",
+    description: "서류작성, 키오스크(무인기기) 등 복잡한 행정절차를 도와드립니다.\n필요한 경우 지역사회 복지자원과 연결해 드립니다.",
     useSignIcon: false,
   },
   {
     icon: "fa-solid fa-user-doctor",
     title: "맞춤형 진료 지원",
-    description: "장애 유형 및 동선을 고려해 진료 일정과 대기 절차를 조정합니다. 진료 후 복약 지도와 다음 내원 절차를 상세히 안내합니다.",
+    description: "장애 유형 및 정도, 이동 동선을 고려하여 진료 일정과 대기 절차를 조정합니다.\n진료 후 복약 지도 및 다음 내원 절차를 안내해드립니다.",
     useSignIcon: false,
   },
 ]
@@ -71,7 +71,8 @@ export function IntroSection({ signLanguageEnabled }: IntroSectionProps) {
             어떤 서비스인가요?
           </h2>
           <p className="text-lg text-[#4a4a4a] max-w-[800px] leading-relaxed">
-            장애인 환자분이 병원 예약부터 귀가하실 때까지 겪는 이동, 의사소통, 행정 절차의 어려움을 덜어드립니다.
+            병원 예약부터 진료, 귀가까지 병원 이용 전 과정에서 필요한 도움을 제공하는 서비스입니다.
+            <br />
             수어통역사를 포함한 전담 인력이 1:1 맞춤형 서비스를 제공합니다.
           </p>
 
@@ -150,7 +151,7 @@ export function IntroSection({ signLanguageEnabled }: IntroSectionProps) {
                   )}
                   {service.title}
                 </h4>
-                <p className="intro-text text-[1.0625rem] text-[#555] leading-relaxed">
+                <p className="intro-text text-[1.0625rem] text-[#555] leading-relaxed whitespace-pre-line">
                   {service.description}
                 </p>
               </div>

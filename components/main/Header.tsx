@@ -51,7 +51,7 @@ export function Header({ currentPage, currentSection, onNavigateMain, onNavigate
             onClick={() => handleNavClick("hero")}
             className="logo text-[1.375rem] font-extrabold text-[#004c28] tracking-tight flex items-center gap-2"
           >
-            <i className="fa-solid fa-hospital" aria-hidden="true"></i>
+            <img src="/logo_ehwa.svg" alt="이대목동병원 로고" className="h-8 w-auto" />
             이대목동병원 장애인 이용편의 지원센터
           </button>
 
@@ -92,7 +92,7 @@ export function Header({ currentPage, currentSection, onNavigateMain, onNavigate
               className={`text-lg font-bold text-[#333] relative py-2.5 transition-colors hover:text-[#004c28]
                 ${isActive("blog") ? "text-[#004c28]" : ""}`}
             >
-              사업소식
+              알림/소식
               {isActive("blog") && <span className="absolute bottom-0 left-0 w-full h-[3px] bg-[#004c28]"></span>}
             </button>
 
@@ -105,7 +105,7 @@ export function Header({ currentPage, currentSection, onNavigateMain, onNavigate
               className="gnb-precheck-btn inline-flex items-center justify-center gap-2.5 h-11 px-[34px] rounded-md bg-white text-[#004c28] border-[1.5px] border-[#004c28] text-base font-bold whitespace-nowrap transition-all hover:bg-[#004c28] hover:text-white"
               aria-label="장애편의지원 사전문진표 PDF 다운로드"
             >
-              <i className="fa-regular fa-file-lines text-sm ml-1" aria-hidden="true"></i>
+              <i className="fa-solid fa-file-arrow-down text-sm ml-1 text-current" aria-hidden="true"></i>
               <span className="mr-1">사전문진표</span>
             </a>
           </nav>
@@ -166,7 +166,7 @@ export function Header({ currentPage, currentSection, onNavigateMain, onNavigate
               onClick={handleBlogClick}
               className="w-full text-xl font-bold text-[#333] py-4 border-b border-[#f5f5f5] flex justify-between items-center"
             >
-              사업소식
+              알림/소식
               <ChevronRight className="h-4 w-4 text-[#ccc]" />
             </button>
           </li>
@@ -179,7 +179,7 @@ export function Header({ currentPage, currentSection, onNavigateMain, onNavigate
               className="flex items-center justify-center gap-1.5 py-3 px-4 rounded-full bg-[#004c28] text-white font-bold border border-[#00381e] text-base"
               aria-label="장애편의지원 사전문진표 PDF 다운로드"
             >
-              <i className="fa-regular fa-file-lines" aria-hidden="true"></i>
+              <i className="fa-solid fa-file-arrow-down text-current" aria-hidden="true"></i>
               <span>사전문진표</span>
             </a>
           </li>

@@ -3,12 +3,22 @@
 import { useState, useEffect } from "react"
 import { Post, getCategoryColor, formatDate } from "@/lib/posts"
 import { PostModal } from "./PostModal"
+import { ChevronLeft, ChevronRight } from "lucide-react"
+
+const ITEMS_PER_PAGE = 10
 
 export function BlogSection() {
   const [posts, setPosts] = useState<Post[]>([])
   const [featuredPosts, setFeaturedPosts] = useState<Post[]>([])
   const [selectedPost, setSelectedPost] = useState<Post | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+
+  // 페이지네이션 계산
+  const totalPages = Math.ceil(posts.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedPosts = posts.slice(startIndex, endIndex)
 
   // 게시글 및 주요 소식 불러오기
   useEffect(() => {
@@ -55,7 +65,7 @@ export function BlogSection() {
       <section className="py-[60px] lg:py-[100px] bg-white">
         <div className="max-w-[1200px] mx-auto px-5">
           <h2 className="text-[1.625rem] lg:text-[2.25rem] font-extrabold text-[#1a1a1a] mb-[50px] tracking-tight">
-            사업 소식
+            알림/소식
           </h2>
 
           {/* 주요 소식 (Featured Cards) */}
@@ -105,7 +115,7 @@ export function BlogSection() {
 
           {/* PC 테이블 */}
           <table className="w-full border-collapse border-spacing-0 border-t-2 border-[#333] hidden lg:table">
-            <caption className="sr-only">사업소식 전체 목록</caption>
+            <caption className="sr-only">알림/소식 전체 목록</caption>
             <colgroup>
               <col style={{ width: "10%" }} />
               <col style={{ width: "70%" }} />
@@ -119,7 +129,7 @@ export function BlogSection() {
               </tr>
             </thead>
             <tbody>
-              {posts.map((post, index) => (
+              {paginatedPosts.map((post, index) => (
                 <tr
                   key={post.id}
                   className="cursor-pointer hover:bg-[#f9f9f9] transition-colors"
@@ -128,7 +138,7 @@ export function BlogSection() {
                   aria-label={`${post.title} 게시글 열기`}
                 >
                   <td className="p-5 text-center border-b border-[#eee] text-[#555] text-lg">
-                    {posts.length - index}
+                    {posts.length - startIndex - index}
                   </td>
                   <td className="p-5 text-left border-b border-[#eee] font-semibold text-[#333] text-lg hover:text-[#004c28] hover:underline">
                     {post.title}
@@ -141,7 +151,7 @@ export function BlogSection() {
 
           {/* 모바일 리스트 */}
           <div className="lg:hidden space-y-3">
-            {posts.map((post) => (
+            {paginatedPosts.map((post) => (
               <div
                 key={post.id}
                 className="p-4 border border-[#eee] rounded-xl bg-white cursor-pointer hover:bg-[#f9f9f9] transition-colors"
@@ -160,6 +170,43 @@ export function BlogSection() {
           {posts.length === 0 && (
             <div className="text-center py-20 text-[#888]">
               <p className="text-lg">등록된 게시글이 없습니다.</p>
+            </div>
+          )}
+
+          {/* 페이지네이션 */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center mt-8 gap-2">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="flex items-center gap-1 px-4 py-2 rounded-md border border-[#ddd] text-[#333] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#f5f5f5] transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                이전
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-10 h-10 rounded-md font-medium transition-colors ${
+                      currentPage === page
+                        ? "bg-[#004c28] text-white"
+                        : "border border-[#ddd] text-[#333] hover:bg-[#f5f5f5]"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="flex items-center gap-1 px-4 py-2 rounded-md border border-[#ddd] text-[#333] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#f5f5f5] transition-colors"
+              >
+                다음
+                <ChevronRight className="h-4 w-4" />
+              </button>
             </div>
           )}
         </div>

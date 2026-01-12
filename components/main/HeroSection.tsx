@@ -64,9 +64,9 @@ export function HeroSection() {
           동행하겠습니다
         </h1>
         <p className="text-[1.125rem] lg:text-[1.375rem] text-[#eee] mb-[50px] font-medium">
-          복잡한 의료기관, 이용하기 막막하셨나요?
+          장벽 없는 병원 이용,
           <br />
-          이동이나 의사소통에 도움이 필요하시다면 언제든 신청해주세요
+          장애인 의료기관 이용편의 지원사업과 함께라면 가능합니다.
         </p>
 
         {/* CTA 버튼 그룹 - HTML과 동일한 스타일 */}
