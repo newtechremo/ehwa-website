@@ -45,12 +45,13 @@ export function Header({ currentPage, currentSection }: HeaderProps) {
           <Link
             href="/"
             onClick={closeMenu}
-            className="logo text-[1.375rem] font-extrabold text-[#004c28] tracking-tight flex items-center gap-2 flex-1 lg:flex-none"
+            className="logo text-[1.375rem] font-extrabold text-[#004c28] tracking-tight flex items-center gap-2 flex-1 lg:flex-none max-w-[calc(100%-60px)] lg:max-w-none"
           >
             <img src="/logo_ehwa.svg" alt="이대목동병원 로고" className="h-8 w-auto flex-shrink-0" />
             <span className="text-left flex flex-wrap">
-              <span className="whitespace-nowrap">이대목동병원</span>
-              <span className="whitespace-nowrap">&nbsp;장애인 이용편의 지원센터</span>
+              <span className="whitespace-nowrap mr-1.5">이대목동병원</span>
+              <span className="whitespace-nowrap mr-1.5">장애인 이용편의</span>
+              <span className="whitespace-nowrap">지원센터</span>
             </span>
           </Link>
 
