@@ -22,9 +22,11 @@ jobs:
             echo "========== 배포 시작 =========="
             cd /home/finefit-temp/Desktop/project/ehwa_website
 
-            # 1. Git Pull
+            # 1. Git Pull (로컬 변경사항 보존)
             echo "1. Git Pull"
+            git stash
             git pull origin main
+            git stash pop || true
 
             # 2. 의존성 설치
             echo "2. 의존성 설치"
