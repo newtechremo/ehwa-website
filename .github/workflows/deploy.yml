@@ -1,0 +1,53 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script_stop: false
+          script: |
+            echo "========== 배포 시작 =========="
+            cd /home/finefit-temp/Desktop/project/ehwa_website
+
+            # 1. Git Pull
+            echo "1. Git Pull"
+            git pull origin main
+
+            # 2. 의존성 설치
+            echo "2. 의존성 설치"
+            npm install
+
+            # 3. 빌드
+            echo "3. 프로덕션 빌드"
+            npm run build
+
+            # 4. PM2로 서버 재시작
+            echo "4. PM2 재시작"
+            pm2 describe ehwa-website > /dev/null 2>&1
+            if [ $? -eq 0 ]; then
+              # 이미 실행 중이면 재시작
+              pm2 restart ehwa-website
+            else
+              # 새로 시작
+              pm2 start npm --name "ehwa-website" -- run start
+            fi
+
+            # 5. PM2 설정 저장 (서버 재부팅 시 자동 시작)
+            pm2 save
+
+            # 완료 확인
+            echo "========== 배포 완료 =========="
+            pm2 status ehwa-website
