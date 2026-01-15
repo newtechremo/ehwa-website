@@ -46,3 +46,7 @@ server.log
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Data files (서버에서 변경되는 데이터)
+data/
+!data/.gitkeep
