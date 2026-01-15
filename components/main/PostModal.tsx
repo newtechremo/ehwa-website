@@ -93,7 +93,27 @@ export function PostModal({ post, isOpen, onClose }: PostModalProps) {
           />
 
           {/* 첨부파일 박스 */}
-          {post.attachment && post.attachment.name && (
+          {post.attachments && post.attachments.length > 0 ? (
+            <div className="space-y-2">
+              {post.attachments.map((att, index) => (
+                <div key={index} className="bg-[#f5f9f7] border border-[#d1e2d9] rounded-lg p-4 flex justify-between items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <Paperclip className="h-5 w-5 text-[#004c28]" />
+                    <span className="text-[#333] font-medium">{att.name}</span>
+                  </div>
+                  {att.data && (
+                    <a
+                      href={att.data}
+                      download={att.name}
+                      className="px-4 py-2 bg-[#004c28] text-white text-sm font-bold rounded-lg hover:bg-[#00381e] transition-colors"
+                    >
+                      다운로드
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : post.attachment && post.attachment.name && (
             <div className="bg-[#f5f9f7] border border-[#d1e2d9] rounded-lg p-4 flex justify-between items-center gap-4">
               <div className="flex items-center gap-3">
                 <Paperclip className="h-5 w-5 text-[#004c28]" />

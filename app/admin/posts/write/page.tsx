@@ -73,8 +73,8 @@ export default function PostWritePage() {
   const [isCompressing, setIsCompressing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // 용량 제한 상수 (대표이미지 + 첨부파일 + 본문이미지 합계 100MB)
-  const MAX_TOTAL_SIZE = 100 * 1024 * 1024 // 100MB (모든 파일 합계)
+  // 용량 제한 상수 (대표이미지 + 첨부파일 + 본문이미지 합계 20MB)
+  const MAX_TOTAL_SIZE = 20 * 1024 * 1024 // 20MB (모든 파일 합계)
   const MAX_BODY_IMAGE_COUNT = 5 // 본문 이미지 최대 5장
 
   const editor = useEditor({
@@ -114,7 +114,7 @@ export default function PostWritePage() {
       // 첨부파일 용량도 포함하여 체크
       const attachmentSize = attachments.reduce((sum, att) => sum + att.size, 0)
       if (newTotalSize + attachmentSize > MAX_TOTAL_SIZE) {
-        alert(`총 용량이 100MB를 초과합니다.\n현재 이미지 용량: ${(totalImageSize / 1024 / 1024).toFixed(2)}MB\n첨부파일 용량: ${(attachmentSize / 1024 / 1024).toFixed(2)}MB\n압축 후 이미지: ${(compressedSize / 1024 / 1024).toFixed(2)}MB`)
+        alert(`총 용량이 20MB를 초과합니다.\n현재 이미지 용량: ${(totalImageSize / 1024 / 1024).toFixed(2)}MB\n첨부파일 용량: ${(attachmentSize / 1024 / 1024).toFixed(2)}MB\n압축 후 이미지: ${(compressedSize / 1024 / 1024).toFixed(2)}MB`)
         return
       }
 
@@ -142,7 +142,7 @@ export default function PostWritePage() {
     fileArray.forEach((file) => {
       const newTotal = currentTotalSize + additionalSize + file.size
       if (newTotal > MAX_TOTAL_SIZE) {
-        errors.push(`"${file.name}"을(를) 추가하면 총 용량이 100MB를 초과합니다.`)
+        errors.push(`"${file.name}"을(를) 추가하면 총 용량이 20MB를 초과합니다.`)
       } else {
         validFiles.push(file)
         additionalSize += file.size
@@ -242,7 +242,7 @@ export default function PostWritePage() {
         const newTotalSize = totalImageSize + compressedSize
         if (newTotalSize + attachmentSize > MAX_TOTAL_SIZE) {
           const remainingSize = MAX_TOTAL_SIZE - totalImageSize - attachmentSize
-          alert(`총 용량이 100MB를 초과합니다.\n현재 이미지 용량: ${(totalImageSize / 1024 / 1024).toFixed(2)}MB\n첨부파일 용량: ${(attachmentSize / 1024 / 1024).toFixed(2)}MB\n압축 후 이미지: ${(compressedSize / 1024 / 1024).toFixed(2)}MB\n남은 용량: ${(remainingSize / 1024 / 1024).toFixed(2)}MB`)
+          alert(`총 용량이 20MB를 초과합니다.\n현재 이미지 용량: ${(totalImageSize / 1024 / 1024).toFixed(2)}MB\n첨부파일 용량: ${(attachmentSize / 1024 / 1024).toFixed(2)}MB\n압축 후 이미지: ${(compressedSize / 1024 / 1024).toFixed(2)}MB\n남은 용량: ${(remainingSize / 1024 / 1024).toFixed(2)}MB`)
           return
         }
 
@@ -429,7 +429,7 @@ export default function PostWritePage() {
                     {isDragging ? "여기에 파일을 놓으세요" : "클릭하거나 파일을 드래그하여 업로드"}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    대표이미지 + 첨부파일 + 본문이미지 합계 최대 100MB
+                    대표이미지 + 첨부파일 + 본문이미지 합계 최대 20MB
                   </p>
                   <input
                     ref={fileInputRef}
@@ -442,7 +442,7 @@ export default function PostWritePage() {
                 </label>
               </div>
               <p className="text-xs text-orange-600">
-                ⚠️ 총 용량 100MB 제한. 대용량 파일은 저장 실패할 수 있습니다.
+                ⚠️ 총 용량 20MB 제한. 대용량 파일은 저장 실패할 수 있습니다.
               </p>
             </div>
 
@@ -452,7 +452,7 @@ export default function PostWritePage() {
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-muted-foreground">
                     본문 이미지: {bodyImageCount}/{MAX_BODY_IMAGE_COUNT}장 |
-                    총 용량: {((totalImageSize + totalAttachmentSize) / 1024 / 1024).toFixed(2)}/100MB
+                    총 용량: {((totalImageSize + totalAttachmentSize) / 1024 / 1024).toFixed(2)}/20MB
                   </span>
                   <Button
                     type="button"

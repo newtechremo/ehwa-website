@@ -52,9 +52,8 @@ export function Header({ currentPage, currentSection, onNavigateMain, onNavigate
             className="logo text-[1.375rem] font-extrabold text-[#004c28] tracking-tight flex items-center gap-2 flex-1 lg:flex-none"
           >
             <img src="/logo_ehwa.svg" alt="이대목동병원 로고" className="h-8 w-auto flex-shrink-0" />
-            <span className="flex flex-wrap break-keep">
-              <span>이대목동병원</span>
-              <span>&nbsp;장애인 이용편의 지원센터</span>
+            <span className="text-left">
+              이대목동병원 장애인 이용편의 지원센터
             </span>
           </button>
 

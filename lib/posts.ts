@@ -15,6 +15,11 @@ export type Post = {
     data: string
     size: number
   } | null
+  attachments?: {
+    name: string
+    data: string
+    size: number
+  }[] | null
 }
 
 export type FeaturedSlots = {
