@@ -1,3 +1,17 @@
+// 첨부파일 타입 정의
+export type Attachment = {
+  name: string
+  path: string  // 파일 경로 (예: /uploads/attachments/123_file.pdf)
+  size: number
+}
+
+// 레거시 첨부파일 타입 (마이그레이션 전 데이터 호환)
+export type LegacyAttachment = {
+  name: string
+  data: string  // base64 데이터
+  size: number
+}
+
 // 게시글 타입 정의 (Admin과 메인 페이지에서 공유)
 export type Post = {
   id: number
@@ -10,16 +24,13 @@ export type Post = {
   publishedAt: string
   createdAt: string
   updatedAt: string
-  attachment?: {
-    name: string
-    data: string
-    size: number
-  } | null
-  attachments?: {
-    name: string
-    data: string
-    size: number
-  }[] | null
+  attachment?: Attachment | LegacyAttachment | null
+  attachments?: (Attachment | LegacyAttachment)[] | null
+}
+
+// 첨부파일이 레거시(base64)인지 확인
+export function isLegacyAttachment(att: Attachment | LegacyAttachment): att is LegacyAttachment {
+  return "data" in att && !("path" in att)
 }
 
 export type FeaturedSlots = {

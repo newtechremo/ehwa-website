@@ -566,11 +566,20 @@ details[open] summary .faq-arrow {
 }
 
 /* 프로스 스타일 (에디터 콘텐츠) */
-.prose-content p {
+.prose-content p,
+.prose p {
   margin-bottom: 10px;
+  min-height: 1.5em; /* 빈 p 태그도 높이 유지 */
 }
 
-.prose-content img {
+/* 빈 p 태그에 줄바꿈 효과 */
+.prose-content p:empty,
+.prose p:empty {
+  min-height: 1.5em;
+}
+
+.prose-content img,
+.prose img {
   max-width: 100%;
   border-radius: 8px;
   margin: 16px 0;

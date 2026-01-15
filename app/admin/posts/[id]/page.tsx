@@ -16,6 +16,9 @@ import StarterKit from "@tiptap/starter-kit"
 import Image from "@tiptap/extension-image"
 import Placeholder from "@tiptap/extension-placeholder"
 
+type Attachment = { name: string; path: string; size: number }
+type LegacyAttachment = { name: string; data: string; size: number }
+
 type Post = {
   id: number
   title: string
@@ -27,8 +30,12 @@ type Post = {
   publishedAt: string
   createdAt: string
   updatedAt: string
-  attachment?: { name: string; data: string; size: number } | null
-  attachments?: { name: string; data: string; size: number }[] | null
+  attachment?: Attachment | LegacyAttachment | null
+  attachments?: (Attachment | LegacyAttachment)[] | null
+}
+
+function isLegacyAttachment(att: Attachment | LegacyAttachment): att is LegacyAttachment {
+  return "data" in att && !("path" in att)
 }
 
 // 이미지 압축 함수
@@ -81,7 +88,7 @@ export default function PostDetailPage() {
   const [category, setCategory] = useState<"공지" | "행사" | "뉴스">("공지")
   const [status, setStatus] = useState(true)
   const [publishedAt, setPublishedAt] = useState("")
-  const [attachments, setAttachments] = useState<{ name: string; data: string; size: number }[]>([])
+  const [attachments, setAttachments] = useState<(Attachment | LegacyAttachment)[]>([])
   const [bodyImageCount, setBodyImageCount] = useState(0)
   const [totalImageSize, setTotalImageSize] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
@@ -199,7 +206,7 @@ export default function PostDetailPage() {
   }
 
   // 첨부파일 다중 업로드 처리
-  const processAttachmentFiles = useCallback((files: FileList | File[]) => {
+  const processAttachmentFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files)
     const validFiles: File[] = []
     const errors: string[] = []
@@ -225,21 +232,26 @@ export default function PostDetailPage() {
 
     if (validFiles.length === 0) return
 
-    // 모든 파일을 순차적으로 읽기
-    validFiles.forEach((file) => {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setAttachments((prev) => [
-          ...prev,
-          {
-            name: file.name,
-            data: reader.result as string,
-            size: file.size,
-          },
-        ])
+    // 서버에 파일 업로드
+    const formData = new FormData()
+    validFiles.forEach((file) => formData.append("files", file))
+
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setAttachments((prev) => [...prev, ...result.files])
+      } else {
+        alert("파일 업로드에 실패했습니다.")
       }
-      reader.readAsDataURL(file)
-    })
+    } catch (error) {
+      console.error("Upload error:", error)
+      alert("파일 업로드 중 오류가 발생했습니다.")
+    }
   }, [attachments, totalImageSize])
 
   const handleAttachmentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -259,9 +271,13 @@ export default function PostDetailPage() {
   }
 
   // 첨부파일 다운로드
-  const handleDownloadAttachment = (att: { name: string; data: string; size: number }) => {
+  const handleDownloadAttachment = (att: Attachment | LegacyAttachment) => {
     const link = document.createElement("a")
-    link.href = att.data
+    if (isLegacyAttachment(att)) {
+      link.href = att.data
+    } else {
+      link.href = att.path
+    }
     link.download = att.name
     link.click()
   }

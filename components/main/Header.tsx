@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { usePathname } from "next/navigation"
+import Link from "next/link"
 import { Menu, X, ChevronRight } from "lucide-react"
 
 type PageType = "main" | "blog"
@@ -9,12 +11,11 @@ type SectionType = "hero" | "intro" | "faq"
 interface HeaderProps {
   currentPage: PageType
   currentSection: SectionType | null
-  onNavigateMain: (section: SectionType) => void
-  onNavigateBlog: () => void
 }
 
-export function Header({ currentPage, currentSection, onNavigateMain, onNavigateBlog }: HeaderProps) {
+export function Header({ currentPage, currentSection }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const pathname = usePathname()
 
   const openMenu = () => {
     setMobileMenuOpen(true)
@@ -26,19 +27,13 @@ export function Header({ currentPage, currentSection, onNavigateMain, onNavigate
     document.body.style.overflow = ""
   }
 
-  const handleNavClick = (section: SectionType) => {
-    closeMenu()
-    onNavigateMain(section)
-  }
-
-  const handleBlogClick = () => {
-    closeMenu()
-    onNavigateBlog()
-  }
-
   const isActive = (page: PageType, section?: SectionType) => {
-    if (page === "blog") return currentPage === "blog"
-    return currentPage === "main" && currentSection === section
+    if (page === "blog") return pathname === "/blog"
+    if (page === "main") {
+      if (pathname !== "/" && pathname !== "") return false
+      return currentSection === section
+    }
+    return false
   }
 
   return (
@@ -47,15 +42,17 @@ export function Header({ currentPage, currentSection, onNavigateMain, onNavigate
       <header className="header-main border-b border-[#e1e1e1] bg-white min-h-[80px] flex items-center relative z-[1500] shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
         <div className="w-full max-w-[1200px] mx-auto px-5 py-3 flex justify-between items-center">
           {/* 로고 */}
-          <button
-            onClick={() => handleNavClick("hero")}
+          <Link
+            href="/"
+            onClick={closeMenu}
             className="logo text-[1.375rem] font-extrabold text-[#004c28] tracking-tight flex items-center gap-2 flex-1 lg:flex-none"
           >
             <img src="/logo_ehwa.svg" alt="이대목동병원 로고" className="h-8 w-auto flex-shrink-0" />
-            <span className="text-left">
-              이대목동병원 장애인 이용편의 지원센터
+            <span className="text-left flex flex-wrap">
+              <span className="whitespace-nowrap">이대목동병원</span>
+              <span className="whitespace-nowrap">&nbsp;장애인 이용편의 지원센터</span>
             </span>
-          </button>
+          </Link>
 
           {/* 모바일 햄버거 버튼 */}
           <button className="lg:hidden text-[1.625rem] text-[#333] p-2.5 flex-shrink-0" onClick={openMenu} aria-label="메뉴 열기">
@@ -64,8 +61,8 @@ export function Header({ currentPage, currentSection, onNavigateMain, onNavigate
 
           {/* PC 네비게이션 */}
           <nav className="gnb-pc hidden lg:flex gap-6 xl:gap-9 flex-wrap items-center">
-            <button
-              onClick={() => handleNavClick("hero")}
+            <Link
+              href="/#hero"
               className={`text-lg font-bold text-[#333] relative py-2.5 transition-colors hover:text-[#004c28]
                 ${isActive("main", "hero") ? "text-[#004c28]" : ""}`}
             >
@@ -73,9 +70,9 @@ export function Header({ currentPage, currentSection, onNavigateMain, onNavigate
               {isActive("main", "hero") && (
                 <span className="absolute bottom-0 left-0 w-full h-[3px] bg-[#004c28]"></span>
               )}
-            </button>
-            <button
-              onClick={() => handleNavClick("intro")}
+            </Link>
+            <Link
+              href="/#intro"
               className={`text-lg font-bold text-[#333] relative py-2.5 transition-colors hover:text-[#004c28]
                 ${isActive("main", "intro") ? "text-[#004c28]" : ""}`}
             >
@@ -83,9 +80,9 @@ export function Header({ currentPage, currentSection, onNavigateMain, onNavigate
               {isActive("main", "intro") && (
                 <span className="absolute bottom-0 left-0 w-full h-[3px] bg-[#004c28]"></span>
               )}
-            </button>
-            <button
-              onClick={() => handleNavClick("faq")}
+            </Link>
+            <Link
+              href="/#faq"
               className={`text-lg font-bold text-[#333] relative py-2.5 transition-colors hover:text-[#004c28]
                 ${isActive("main", "faq") ? "text-[#004c28]" : ""}`}
             >
@@ -93,15 +90,15 @@ export function Header({ currentPage, currentSection, onNavigateMain, onNavigate
               {isActive("main", "faq") && (
                 <span className="absolute bottom-0 left-0 w-full h-[3px] bg-[#004c28]"></span>
               )}
-            </button>
-            <button
-              onClick={handleBlogClick}
+            </Link>
+            <Link
+              href="/blog"
               className={`text-lg font-bold text-[#333] relative py-2.5 transition-colors hover:text-[#004c28]
                 ${isActive("blog") ? "text-[#004c28]" : ""}`}
             >
               알림/소식
               {isActive("blog") && <span className="absolute bottom-0 left-0 w-full h-[3px] bg-[#004c28]"></span>}
-            </button>
+            </Link>
 
             {/* 사전문진표 버튼 */}
             <a
@@ -137,40 +134,44 @@ export function Header({ currentPage, currentSection, onNavigateMain, onNavigate
 
         <ul className="flex-1">
           <li>
-            <button
-              onClick={() => handleNavClick("hero")}
+            <Link
+              href="/#hero"
+              onClick={closeMenu}
               className="w-full text-xl font-bold text-[#333] py-4 border-b border-[#f5f5f5] flex justify-between items-center"
             >
               신청하기
               <ChevronRight className="h-4 w-4 text-[#ccc]" />
-            </button>
+            </Link>
           </li>
           <li>
-            <button
-              onClick={() => handleNavClick("intro")}
+            <Link
+              href="/#intro"
+              onClick={closeMenu}
               className="w-full text-xl font-bold text-[#333] py-4 border-b border-[#f5f5f5] flex justify-between items-center"
             >
               알아보기
               <ChevronRight className="h-4 w-4 text-[#ccc]" />
-            </button>
+            </Link>
           </li>
           <li>
-            <button
-              onClick={() => handleNavClick("faq")}
+            <Link
+              href="/#faq"
+              onClick={closeMenu}
               className="w-full text-xl font-bold text-[#333] py-4 border-b border-[#f5f5f5] flex justify-between items-center"
             >
               자주 묻는 질문
               <ChevronRight className="h-4 w-4 text-[#ccc]" />
-            </button>
+            </Link>
           </li>
           <li>
-            <button
-              onClick={handleBlogClick}
+            <Link
+              href="/blog"
+              onClick={closeMenu}
               className="w-full text-xl font-bold text-[#333] py-4 border-b border-[#f5f5f5] flex justify-between items-center"
             >
               알림/소식
               <ChevronRight className="h-4 w-4 text-[#ccc]" />
-            </button>
+            </Link>
           </li>
           <li className="mt-4">
             <a

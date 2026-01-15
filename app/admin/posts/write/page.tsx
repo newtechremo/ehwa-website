@@ -66,7 +66,7 @@ export default function PostWritePage() {
   const [category, setCategory] = useState<"공지" | "행사" | "뉴스">("공지")
   const [status, setStatus] = useState(true)
   const [publishedAt, setPublishedAt] = useState(new Date().toISOString().slice(0, 16))
-  const [attachments, setAttachments] = useState<{ name: string; data: string; size: number }[]>([])
+  const [attachments, setAttachments] = useState<{ name: string; path: string; size: number }[]>([])
   const [bodyImageCount, setBodyImageCount] = useState(0)
   const [totalImageSize, setTotalImageSize] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
@@ -129,7 +129,7 @@ export default function PostWritePage() {
   }
 
   // 첨부파일 다중 업로드 처리
-  const processAttachmentFiles = useCallback((files: FileList | File[]) => {
+  const processAttachmentFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files)
     const validFiles: File[] = []
     const errors: string[] = []
@@ -155,21 +155,26 @@ export default function PostWritePage() {
 
     if (validFiles.length === 0) return
 
-    // 모든 파일을 순차적으로 읽기
-    validFiles.forEach((file) => {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setAttachments((prev) => [
-          ...prev,
-          {
-            name: file.name,
-            data: reader.result as string,
-            size: file.size,
-          },
-        ])
+    // 서버에 파일 업로드
+    const formData = new FormData()
+    validFiles.forEach((file) => formData.append("files", file))
+
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setAttachments((prev) => [...prev, ...result.files])
+      } else {
+        alert("파일 업로드에 실패했습니다.")
       }
-      reader.readAsDataURL(file)
-    })
+    } catch (error) {
+      console.error("Upload error:", error)
+      alert("파일 업로드 중 오류가 발생했습니다.")
+    }
   }, [attachments, totalImageSize])
 
   const handleAttachmentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

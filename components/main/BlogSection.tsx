@@ -50,8 +50,19 @@ export function BlogSection() {
     loadPosts()
   }, [])
 
-  const openPost = (post: Post) => {
-    setSelectedPost(post)
+  const openPost = async (post: Post) => {
+    // 첨부파일 데이터 포함된 전체 게시글 가져오기
+    try {
+      const response = await fetch(`/api/posts?id=${post.id}`)
+      if (response.ok) {
+        const fullPost = await response.json()
+        setSelectedPost(fullPost)
+      } else {
+        setSelectedPost(post)
+      }
+    } catch {
+      setSelectedPost(post)
+    }
     setIsModalOpen(true)
   }
 
