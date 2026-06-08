@@ -1,35 +1,22 @@
 import { NextResponse } from "next/server"
-import fs from "fs"
 import path from "path"
+import { ATTACHMENT_BUCKET, uploadAttachmentFile, deleteAttachmentFile } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
+export const maxDuration = 60
 
-const uploadDir = path.join(process.cwd(), "public", "uploads", "attachments")
-
-// 디렉토리 존재 확인 및 생성
-function ensureUploadDir() {
-  if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true })
-  }
-}
-
-// 고유 파일명 생성
-function generateUniqueFilename(originalName: string): string {
+// 고유 스토리지 키 생성 (ASCII 안전 — 표시용 원본명은 attachment.name에 별도 보관)
+function generateKey(originalName: string): string {
   const timestamp = Date.now()
   const random = Math.random().toString(36).substring(2, 8)
-  const ext = path.extname(originalName)
-  const baseName = path.basename(originalName, ext)
-    .replace(/[^a-zA-Z0-9가-힣_-]/g, "_") // 특수문자 제거
-    .substring(0, 50) // 파일명 길이 제한
-  return `${timestamp}_${random}_${baseName}${ext}`
+  const ext = path.extname(originalName).replace(/[^a-zA-Z0-9.]/g, "")
+  return `${timestamp}_${random}${ext}`
 }
 
-// POST: 파일 업로드
+// POST: 파일 업로드 → Supabase Storage
 export async function POST(request: Request) {
   try {
-    ensureUploadDir()
-
     const formData = await request.formData()
     const files = formData.getAll("files") as File[]
 
@@ -41,15 +28,12 @@ export async function POST(request: Request) {
 
     for (const file of files) {
       const buffer = Buffer.from(await file.arrayBuffer())
-      const uniqueFilename = generateUniqueFilename(file.name)
-      const filePath = path.join(uploadDir, uniqueFilename)
-
-      // 파일 저장
-      fs.writeFileSync(filePath, buffer)
+      const key = generateKey(file.name)
+      const publicUrl = await uploadAttachmentFile(key, buffer, file.type || "application/octet-stream")
 
       uploadedFiles.push({
-        name: file.name, // 원본 파일명
-        path: `/uploads/attachments/${uniqueFilename}`, // 웹 접근 경로
+        name: file.name, // 원본 파일명 (표시/다운로드용)
+        path: publicUrl, // Supabase Storage 공개 URL
         size: file.size,
       })
     }
@@ -61,7 +45,7 @@ export async function POST(request: Request) {
   }
 }
 
-// DELETE: 파일 삭제
+// DELETE: Storage 파일 삭제 (path = Storage 공개 URL)
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -71,19 +55,16 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: "Path required" }, { status: 400 })
     }
 
-    // 보안: uploads/attachments 디렉토리 내 파일만 삭제 허용
-    if (!filePath.startsWith("/uploads/attachments/")) {
+    // 보안: 해당 버킷 경로만 허용. URL에서 key 추출
+    const marker = `/${ATTACHMENT_BUCKET}/`
+    const idx = filePath.indexOf(marker)
+    if (idx === -1) {
       return NextResponse.json({ success: false, error: "Invalid path" }, { status: 400 })
     }
+    const key = decodeURIComponent(filePath.substring(idx + marker.length))
 
-    const fullPath = path.join(process.cwd(), "public", filePath)
-
-    if (fs.existsSync(fullPath)) {
-      fs.unlinkSync(fullPath)
-      return NextResponse.json({ success: true })
-    } else {
-      return NextResponse.json({ success: false, error: "File not found" }, { status: 404 })
-    }
+    await deleteAttachmentFile(key)
+    return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Delete error:", error)
     return NextResponse.json({ success: false, error: "Delete failed" }, { status: 500 })

@@ -4,7 +4,7 @@ import { getFeaturedSlots, updateFeaturedSlots } from "@/lib/db"
 // GET: 주요 소식 슬롯 조회
 export async function GET() {
   try {
-    const slots = getFeaturedSlots()
+    const slots = await getFeaturedSlots()
     return NextResponse.json({
       slot1Id: slots.slot1Id,
       slot2Id: slots.slot2Id,
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { slot1Id, slot2Id, slot3Id } = body
 
-    updateFeaturedSlots({
+    await updateFeaturedSlots({
       slot1Id: slot1Id ?? null,
       slot2Id: slot2Id ?? null,
       slot3Id: slot3Id ?? null,

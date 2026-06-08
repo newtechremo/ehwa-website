@@ -1,82 +1,26 @@
-import Database from "better-sqlite3"
-import path from "path"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 
-// 데이터베이스 파일 경로
-const dbPath = path.join(process.cwd(), "data", "ehwa.db")
+// ============ Supabase 클라이언트 (서버 전용 / service_role) ============
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-// 싱글톤 데이터베이스 인스턴스
-let db: Database.Database | null = null
+let client: SupabaseClient | null = null
 
-export function getDb(): Database.Database {
-  if (!db) {
-    db = new Database(dbPath)
-    db.pragma("journal_mode = WAL")
-    initializeDb(db)
+function db(): SupabaseClient {
+  if (!client) {
+    if (!supabaseUrl || !serviceKey) {
+      throw new Error("Supabase 환경변수(NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)가 없습니다.")
+    }
+    client = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
   }
-  return db
+  return client
 }
 
-// 데이터베이스 초기화
-function initializeDb(db: Database.Database) {
-  // posts 테이블
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS posts (
-      id INTEGER PRIMARY KEY,
-      title TEXT NOT NULL,
-      content TEXT NOT NULL,
-      thumbnailImage TEXT,
-      category TEXT NOT NULL CHECK(category IN ('공지', '행사', '뉴스')),
-      status INTEGER NOT NULL DEFAULT 1,
-      viewCount INTEGER NOT NULL DEFAULT 0,
-      publishedAt TEXT NOT NULL,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL
-    )
-  `)
+export const ATTACHMENT_BUCKET = "ehwa-attachments"
 
-  // attachments 테이블 (1:N 관계)
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS attachments (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      postId INTEGER NOT NULL,
-      name TEXT NOT NULL,
-      path TEXT NOT NULL,
-      size INTEGER NOT NULL DEFAULT 0,
-      isLegacy INTEGER NOT NULL DEFAULT 0,
-      legacyData TEXT,
-      FOREIGN KEY (postId) REFERENCES posts(id) ON DELETE CASCADE
-    )
-  `)
-
-  // featured_slots 테이블
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS featured_slots (
-      id INTEGER PRIMARY KEY CHECK(id = 1),
-      slot1Id INTEGER,
-      slot2Id INTEGER,
-      slot3Id INTEGER,
-      FOREIGN KEY (slot1Id) REFERENCES posts(id) ON DELETE SET NULL,
-      FOREIGN KEY (slot2Id) REFERENCES posts(id) ON DELETE SET NULL,
-      FOREIGN KEY (slot3Id) REFERENCES posts(id) ON DELETE SET NULL
-    )
-  `)
-
-  // featured_slots 초기 레코드 생성
-  db.exec(`
-    INSERT OR IGNORE INTO featured_slots (id, slot1Id, slot2Id, slot3Id)
-    VALUES (1, NULL, NULL, NULL)
-  `)
-
-  // 인덱스 생성
-  db.exec(`
-    CREATE INDEX IF NOT EXISTS idx_posts_status ON posts(status);
-    CREATE INDEX IF NOT EXISTS idx_posts_category ON posts(category);
-    CREATE INDEX IF NOT EXISTS idx_posts_publishedAt ON posts(publishedAt);
-    CREATE INDEX IF NOT EXISTS idx_attachments_postId ON attachments(postId);
-  `)
-}
-
-// Post 타입 정의
+// ============ 타입 (기존 코드 호환: status/isLegacy는 0/1 number 유지) ============
 export type PostRow = {
   id: number
   title: string
@@ -107,140 +51,128 @@ export type FeaturedSlotsRow = {
   slot3Id: number | null
 }
 
+// ============ 경계 변환 (Postgres boolean <-> 기존 number 0/1) ============
+function toPostRow(r: any): PostRow {
+  return { ...r, status: r.status ? 1 : 0 } as PostRow
+}
+function toAttachmentRow(r: any): AttachmentRow {
+  return { ...r, isLegacy: r.isLegacy ? 1 : 0 } as AttachmentRow
+}
+
 // ============ Posts CRUD ============
-
-// 모든 게시글 조회
-export function getAllPosts(): PostRow[] {
-  const db = getDb()
-  return db.prepare("SELECT * FROM posts ORDER BY publishedAt DESC").all() as PostRow[]
+export async function getAllPosts(): Promise<PostRow[]> {
+  const { data, error } = await db().from("posts").select("*").order("publishedAt", { ascending: false })
+  if (error) throw error
+  return (data ?? []).map(toPostRow)
 }
 
-// 활성 게시글만 조회
-export function getActivePosts(): PostRow[] {
-  const db = getDb()
-  return db.prepare("SELECT * FROM posts WHERE status = 1 ORDER BY publishedAt DESC").all() as PostRow[]
+export async function getActivePosts(): Promise<PostRow[]> {
+  const { data, error } = await db()
+    .from("posts")
+    .select("*")
+    .eq("status", true)
+    .order("publishedAt", { ascending: false })
+  if (error) throw error
+  return (data ?? []).map(toPostRow)
 }
 
-// 단일 게시글 조회
-export function getPostById(id: number): PostRow | null {
-  const db = getDb()
-  return db.prepare("SELECT * FROM posts WHERE id = ?").get(id) as PostRow | null
+export async function getPostById(id: number): Promise<PostRow | null> {
+  const { data, error } = await db().from("posts").select("*").eq("id", id).maybeSingle()
+  if (error) throw error
+  return data ? toPostRow(data) : null
 }
 
-// 게시글 생성
-export function createPost(post: Omit<PostRow, "id"> & { id?: number }): number {
-  const db = getDb()
+export async function createPost(post: Omit<PostRow, "id"> & { id?: number }): Promise<number> {
   const id = post.id || Date.now()
-  const stmt = db.prepare(`
-    INSERT INTO posts (id, title, content, thumbnailImage, category, status, viewCount, publishedAt, createdAt, updatedAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `)
-  stmt.run(
+  const { error } = await db().from("posts").insert({
     id,
-    post.title,
-    post.content,
-    post.thumbnailImage || null,
-    post.category,
-    post.status,
-    post.viewCount,
-    post.publishedAt,
-    post.createdAt,
-    post.updatedAt
-  )
+    title: post.title,
+    content: post.content,
+    thumbnailImage: post.thumbnailImage || null,
+    category: post.category,
+    status: !!post.status,
+    viewCount: post.viewCount ?? 0,
+    publishedAt: post.publishedAt,
+    createdAt: post.createdAt,
+    updatedAt: post.updatedAt,
+  })
+  if (error) throw error
   return id
 }
 
-// 게시글 수정
-export function updatePost(id: number, post: Partial<PostRow>): boolean {
-  const db = getDb()
-  const existing = getPostById(id)
-  if (!existing) return false
+export async function updatePost(id: number, post: Partial<PostRow>): Promise<boolean> {
+  const patch: Record<string, any> = { updatedAt: new Date().toISOString() }
+  if (post.title !== undefined) patch.title = post.title
+  if (post.content !== undefined) patch.content = post.content
+  if (post.thumbnailImage !== undefined) patch.thumbnailImage = post.thumbnailImage || null
+  if (post.category !== undefined) patch.category = post.category
+  if (post.status !== undefined) patch.status = !!post.status
+  if (post.viewCount !== undefined) patch.viewCount = post.viewCount
+  if (post.publishedAt !== undefined) patch.publishedAt = post.publishedAt
 
-  const updated = { ...existing, ...post, updatedAt: new Date().toISOString() }
-  const stmt = db.prepare(`
-    UPDATE posts SET
-      title = ?, content = ?, thumbnailImage = ?, category = ?,
-      status = ?, viewCount = ?, publishedAt = ?, updatedAt = ?
-    WHERE id = ?
-  `)
-  stmt.run(
-    updated.title,
-    updated.content,
-    updated.thumbnailImage,
-    updated.category,
-    updated.status,
-    updated.viewCount,
-    updated.publishedAt,
-    updated.updatedAt,
-    id
-  )
-  return true
+  const { data, error } = await db().from("posts").update(patch).eq("id", id).select("id")
+  if (error) throw error
+  return (data?.length ?? 0) > 0
 }
 
-// 게시글 삭제
-export function deletePost(id: number): boolean {
-  const db = getDb()
-  const result = db.prepare("DELETE FROM posts WHERE id = ?").run(id)
-  return result.changes > 0
+export async function deletePost(id: number): Promise<boolean> {
+  const { data, error } = await db().from("posts").delete().eq("id", id).select("id")
+  if (error) throw error
+  return (data?.length ?? 0) > 0
 }
 
-// 조회수 증가
-export function incrementViewCount(id: number): void {
-  const db = getDb()
-  db.prepare("UPDATE posts SET viewCount = viewCount + 1 WHERE id = ?").run(id)
+export async function incrementViewCount(id: number): Promise<void> {
+  const current = await getPostById(id)
+  if (!current) return
+  const { error } = await db().from("posts").update({ viewCount: current.viewCount + 1 }).eq("id", id)
+  if (error) throw error
 }
 
 // ============ Attachments CRUD ============
-
-// 게시글의 첨부파일 조회
-export function getAttachmentsByPostId(postId: number): AttachmentRow[] {
-  const db = getDb()
-  return db.prepare("SELECT * FROM attachments WHERE postId = ?").all(postId) as AttachmentRow[]
+export async function getAttachmentsByPostId(postId: number): Promise<AttachmentRow[]> {
+  const { data, error } = await db().from("attachments").select("*").eq("postId", postId)
+  if (error) throw error
+  return (data ?? []).map(toAttachmentRow)
 }
 
-// 첨부파일 추가
-export function addAttachment(attachment: Omit<AttachmentRow, "id">): number {
-  const db = getDb()
-  const stmt = db.prepare(`
-    INSERT INTO attachments (postId, name, path, size, isLegacy, legacyData)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `)
-  const result = stmt.run(
-    attachment.postId,
-    attachment.name,
-    attachment.path,
-    attachment.size,
-    attachment.isLegacy,
-    attachment.legacyData
-  )
-  return Number(result.lastInsertRowid)
+export async function addAttachment(attachment: Omit<AttachmentRow, "id">): Promise<number> {
+  const { data, error } = await db()
+    .from("attachments")
+    .insert({
+      postId: attachment.postId,
+      name: attachment.name,
+      path: attachment.path,
+      size: attachment.size,
+      isLegacy: !!attachment.isLegacy,
+      legacyData: attachment.legacyData,
+    })
+    .select("id")
+    .single()
+  if (error) throw error
+  return Number(data.id)
 }
 
-// 게시글의 모든 첨부파일 삭제
-export function deleteAttachmentsByPostId(postId: number): void {
-  const db = getDb()
-  db.prepare("DELETE FROM attachments WHERE postId = ?").run(postId)
+export async function deleteAttachmentsByPostId(postId: number): Promise<void> {
+  const { error } = await db().from("attachments").delete().eq("postId", postId)
+  if (error) throw error
 }
 
 // ============ Featured Slots CRUD ============
-
-// 주요 소식 슬롯 조회
-export function getFeaturedSlots(): FeaturedSlotsRow {
-  const db = getDb()
-  return db.prepare("SELECT * FROM featured_slots WHERE id = 1").get() as FeaturedSlotsRow
+export async function getFeaturedSlots(): Promise<FeaturedSlotsRow> {
+  const { data, error } = await db().from("featured_slots").select("*").eq("id", 1).single()
+  if (error) throw error
+  return data as FeaturedSlotsRow
 }
 
-// 주요 소식 슬롯 업데이트
-export function updateFeaturedSlots(slots: Omit<FeaturedSlotsRow, "id">): void {
-  const db = getDb()
-  db.prepare(`
-    UPDATE featured_slots SET slot1Id = ?, slot2Id = ?, slot3Id = ? WHERE id = 1
-  `).run(slots.slot1Id, slots.slot2Id, slots.slot3Id)
+export async function updateFeaturedSlots(slots: Omit<FeaturedSlotsRow, "id">): Promise<void> {
+  const { error } = await db()
+    .from("featured_slots")
+    .update({ slot1Id: slots.slot1Id, slot2Id: slots.slot2Id, slot3Id: slots.slot3Id })
+    .eq("id", 1)
+  if (error) throw error
 }
 
-// ============ 헬퍼 함수 ============
-
-// PostRow를 클라이언트용 Post 타입으로 변환
+// ============ 헬퍼 ============
 export function toClientPost(row: PostRow, attachments: AttachmentRow[] = []) {
   return {
     id: row.id,
@@ -253,42 +185,59 @@ export function toClientPost(row: PostRow, attachments: AttachmentRow[] = []) {
     publishedAt: row.publishedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-    attachments: attachments.map(att => ({
-      name: att.name,
-      path: att.path,
-      size: att.size,
-    })),
-    // 단일 attachment는 첫 번째 첨부파일로 설정 (레거시 호환)
-    attachment: attachments.length > 0 ? {
-      name: attachments[0].name,
-      path: attachments[0].path,
-      size: attachments[0].size,
-    } : null,
+    attachments: attachments.map((att) => ({ name: att.name, path: att.path, size: att.size })),
+    attachment:
+      attachments.length > 0
+        ? { name: attachments[0].name, path: attachments[0].path, size: attachments[0].size }
+        : null,
   }
 }
 
-// 전체 게시글을 클라이언트 형식으로 변환
-export function getAllPostsWithAttachments() {
-  const posts = getAllPosts()
-  return posts.map(post => {
-    const attachments = getAttachmentsByPostId(post.id)
-    return toClientPost(post, attachments)
-  })
+// 여러 게시글의 첨부를 한 번에 조회해 그룹핑 (N+1 방지)
+async function attachmentsByPostIds(ids: number[]): Promise<Map<number, AttachmentRow[]>> {
+  const map = new Map<number, AttachmentRow[]>()
+  if (ids.length === 0) return map
+  const { data, error } = await db().from("attachments").select("*").in("postId", ids)
+  if (error) throw error
+  for (const r of data ?? []) {
+    const a = toAttachmentRow(r)
+    const list = map.get(a.postId) ?? []
+    list.push(a)
+    map.set(a.postId, list)
+  }
+  return map
 }
 
-// 활성 게시글을 클라이언트 형식으로 변환
-export function getActivePostsWithAttachments() {
-  const posts = getActivePosts()
-  return posts.map(post => {
-    const attachments = getAttachmentsByPostId(post.id)
-    return toClientPost(post, attachments)
-  })
+export async function getAllPostsWithAttachments() {
+  const posts = await getAllPosts()
+  const map = await attachmentsByPostIds(posts.map((p) => p.id))
+  return posts.map((p) => toClientPost(p, map.get(p.id) ?? []))
 }
 
-// 단일 게시글을 클라이언트 형식으로 변환
-export function getPostWithAttachments(id: number) {
-  const post = getPostById(id)
+export async function getActivePostsWithAttachments() {
+  const posts = await getActivePosts()
+  const map = await attachmentsByPostIds(posts.map((p) => p.id))
+  return posts.map((p) => toClientPost(p, map.get(p.id) ?? []))
+}
+
+export async function getPostWithAttachments(id: number) {
+  const post = await getPostById(id)
   if (!post) return null
-  const attachments = getAttachmentsByPostId(id)
+  const attachments = await getAttachmentsByPostId(id)
   return toClientPost(post, attachments)
+}
+
+// ============ Storage ============
+export async function uploadAttachmentFile(key: string, bytes: Buffer, contentType: string): Promise<string> {
+  const { error } = await db().storage.from(ATTACHMENT_BUCKET).upload(key, bytes, {
+    contentType,
+    upsert: true,
+  })
+  if (error) throw error
+  const { data } = db().storage.from(ATTACHMENT_BUCKET).getPublicUrl(key)
+  return data.publicUrl
+}
+
+export async function deleteAttachmentFile(key: string): Promise<void> {
+  await db().storage.from(ATTACHMENT_BUCKET).remove([key])
 }

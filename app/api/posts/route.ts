@@ -27,10 +27,10 @@ export async function GET(request: Request) {
     if (id) {
       // 조회수 증가 옵션
       if (incrementView === "true") {
-        incrementViewCount(Number(id))
+        await incrementViewCount(Number(id))
       }
 
-      const post = getPostWithAttachments(Number(id))
+      const post = await getPostWithAttachments(Number(id))
       if (post) {
         return NextResponse.json(post)
       }
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     }
 
     // 목록 조회
-    const posts = getAllPostsWithAttachments()
+    const posts = await getAllPostsWithAttachments()
     return NextResponse.json(posts)
   } catch (error) {
     console.error("Error fetching posts:", error)
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     if (Array.isArray(body)) {
       let count = 0
       for (const post of body) {
-        const postId = createPost({
+        const postId = await createPost({
           id: post.id,
           title: post.title,
           content: post.content,
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
         }
 
         for (const att of attachments) {
-          addAttachment({
+          await addAttachment({
             postId,
             name: att.name,
             path: att.path || "",
@@ -91,11 +91,11 @@ export async function POST(request: Request) {
     }
 
     // 단일 게시글 추가/수정
-    const existingPost = body.id ? getPostWithAttachments(body.id) : null
+    const existingPost = body.id ? await getPostWithAttachments(body.id) : null
 
     if (existingPost) {
       // 수정
-      updatePost(body.id, {
+      await updatePost(body.id, {
         title: body.title,
         content: body.content,
         thumbnailImage: body.thumbnailImage || null,
@@ -106,10 +106,10 @@ export async function POST(request: Request) {
       })
 
       // 첨부파일 갱신 (기존 삭제 후 새로 추가)
-      deleteAttachmentsByPostId(body.id)
+      await deleteAttachmentsByPostId(body.id)
       const attachments = body.attachments || []
       for (const att of attachments) {
-        addAttachment({
+        await addAttachment({
           postId: body.id,
           name: att.name,
           path: att.path || "",
@@ -119,11 +119,11 @@ export async function POST(request: Request) {
         })
       }
 
-      const updatedPost = getPostWithAttachments(body.id)
+      const updatedPost = await getPostWithAttachments(body.id)
       return NextResponse.json({ success: true, post: updatedPost })
     } else {
       // 신규 생성
-      const postId = createPost({
+      const postId = await createPost({
         id: body.id || Date.now(),
         title: body.title,
         content: body.content,
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
       // 첨부파일 추가
       const attachments = body.attachments || []
       for (const att of attachments) {
-        addAttachment({
+        await addAttachment({
           postId,
           name: att.name,
           path: att.path || "",
@@ -149,7 +149,7 @@ export async function POST(request: Request) {
         })
       }
 
-      const newPost = getPostWithAttachments(postId)
+      const newPost = await getPostWithAttachments(postId)
       return NextResponse.json({ success: true, post: newPost })
     }
   } catch (error) {
@@ -168,7 +168,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: "ID required" }, { status: 400 })
     }
 
-    const success = deletePost(Number(id))
+    const success = await deletePost(Number(id))
     if (success) {
       return NextResponse.json({ success: true })
     } else {
