@@ -13,6 +13,7 @@ import {
 // App Router: 라우트 설정
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
+export const preferredRegion = "icn1" // 서울 — Supabase(서울)·한국 사용자와 동일 리전
 export const maxDuration = 60
 export const fetchCache = "force-no-store"
 

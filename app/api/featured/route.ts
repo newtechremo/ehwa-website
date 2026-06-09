@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 import { getFeaturedSlots, updateFeaturedSlots } from "@/lib/db"
 
+export const dynamic = "force-dynamic"
+export const runtime = "nodejs"
+export const preferredRegion = "icn1" // 서울 — Supabase(서울)와 동일 리전
+
 // GET: 주요 소식 슬롯 조회
 export async function GET() {
   try {

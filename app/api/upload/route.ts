@@ -4,6 +4,7 @@ import { ATTACHMENT_BUCKET, uploadAttachmentFile, deleteAttachmentFile } from "@
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
+export const preferredRegion = "icn1" // 서울 — Supabase Storage(서울)와 동일 리전
 export const maxDuration = 60
 
 // 고유 스토리지 키 생성 (ASCII 안전 — 표시용 원본명은 attachment.name에 별도 보관)
