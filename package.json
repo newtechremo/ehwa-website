@@ -11,7 +11,8 @@
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
-    "db:status": "supabase status"
+    "db:status": "supabase status",
+    "admin:hash": "tsx scripts/admin-hash.mts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

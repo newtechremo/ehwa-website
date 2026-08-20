@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isAuthConfigured, isAuthenticated } from "@/lib/auth"
 import path from "path"
 import { ATTACHMENT_BUCKET, uploadAttachmentFile, deleteAttachmentFile } from "@/lib/db"
 
@@ -16,7 +17,24 @@ function generateKey(originalName: string): string {
 }
 
 // POST: 파일 업로드 → Supabase Storage
+/** 쓰기 요청은 관리자 세션이 있어야 한다 */
+function denyIfUnauthorized(request: Request) {
+  if (!isAuthConfigured()) {
+    return NextResponse.json(
+      { success: false, error: "서버에 관리자 인증이 설정되지 않았습니다." },
+      { status: 503 },
+    )
+  }
+  if (!isAuthenticated(request)) {
+    return NextResponse.json({ success: false, error: "인증이 필요합니다." }, { status: 401 })
+  }
+  return null
+}
+
 export async function POST(request: Request) {
+  const denied = denyIfUnauthorized(request)
+  if (denied) return denied
+
   try {
     const formData = await request.formData()
     const files = formData.getAll("files") as File[]
@@ -48,6 +66,9 @@ export async function POST(request: Request) {
 
 // DELETE: Storage 파일 삭제 (path = Storage 공개 URL)
 export async function DELETE(request: Request) {
+  const denied = denyIfUnauthorized(request)
+  if (denied) return denied
+
   try {
     const { searchParams } = new URL(request.url)
     const filePath = searchParams.get("path")

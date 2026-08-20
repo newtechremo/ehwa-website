@@ -52,13 +52,24 @@ export default function AdminLayout({
       return
     }
 
-    const authStatus = localStorage.getItem("isAuthenticated")
-    if (authStatus === "true") {
-      setIsAuthenticated(true)
-    } else {
-      router.push("/admin/login")
+    // 서버에 세션 유효성을 확인한다 (localStorage 플래그는 신뢰하지 않는다)
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/admin/session", { cache: "no-store" })
+        const data = await res.json().catch(() => ({}))
+        if (cancelled) return
+        if (data?.authenticated) setIsAuthenticated(true)
+        else router.push("/admin/login")
+      } catch {
+        if (!cancelled) router.push("/admin/login")
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
     }
-    setIsLoading(false)
   }, [router, isLoginPage])
 
   const menuItems = [
@@ -76,9 +87,15 @@ export default function AdminLayout({
     },
   ]
 
-  const handleLogout = () => {
-    localStorage.removeItem("isAuthenticated")
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/admin/logout", { method: "POST" })
+    } catch {
+      /* 쿠키 삭제 실패해도 로그인 화면으로 보낸다 */
+    }
+    localStorage.removeItem("isAuthenticated") // 구버전 잔여 플래그 정리
     router.push("/admin/login")
+    router.refresh()
   }
 
   // 로그인 페이지는 레이아웃 없이 렌더링
