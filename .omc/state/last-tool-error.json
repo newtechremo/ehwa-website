@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"pkill -f \\\"next dev --port 3112\\\" 2>/dev/null; pkill -f \\\"next-server\\\" 2>/dev/null; sleep 1\\necho \\\"dev 서버 종료 (필요 시 npm run dev)\\\"\\necho \\\"로컬 Supabase는 유지 중:\\\"; rtk npx supabase status 2>...",
-  "error": "Exit code 144",
-  "timestamp": "2026-08-20T07:12:39.750Z",
-  "retry_count": 1
-}

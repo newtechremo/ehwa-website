@@ -55,3 +55,6 @@ data/
 # Supabase local
 supabase/.temp/
 supabase/.branches/
+
+# OMC 툴링 세션 상태 (로컬 전용)
+.omc/
