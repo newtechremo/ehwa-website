@@ -9,6 +9,25 @@ import { ChatActionCard } from "./ChatActionCard"
 import { ChatRich } from "./ChatRich"
 
 const MAX_INPUT = 500
+const BACK_BUTTONS: ChatButton[] = [
+  { label: "처음으로", goTo: "root" },
+  { label: "질문하기", goTo: "ask" },
+]
+const FALLBACK_TEXT = "답변을 가져오지 못했어요. 편의지원팀으로 문의해 주세요."
+
+function serverSourceToLogKind(source: string | undefined): LogKind {
+  switch (source) {
+    case "policy":
+      return "policy_block"
+    case "faq":
+      return "faq_hit"
+    case "kb":
+    case "ai":
+      return "ai_answer"
+    default:
+      return "fallback"
+  }
+}
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
@@ -126,20 +145,40 @@ export function ChatWidget() {
   )
 
   const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
+    async (e: React.FormEvent) => {
       e.preventDefault()
       const text = input.trim()
       if (!text || pending) return
       setInput("")
       push(userMessage(text))
-      const r = routeFreeText(text)
-      log(r.logKind, { input: text, refId: r.refId })
       setPending(true)
-      window.setTimeout(() => {
+
+      // 서버가 정책 → FAQ → KB 검색 → AI → fallback 순으로 판단한다.
+      // 서버가 응답하지 못하면 클라이언트 엔진(정책·FAQ)만으로 즉시 대응한다.
+      try {
+        const res = await fetch("/api/chatbot/ask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: text, sessionId: getSessionId() }),
+        })
+        const data = await res.json()
+        push({
+          id: `b-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          role: "bot",
+          text: data?.answer || FALLBACK_TEXT,
+          source: data?.source === "ai" ? "ai" : data?.source === "kb" ? "node" : "fallback",
+          actions: data?.actions ?? undefined,
+          buttons: BACK_BUTTONS,
+        })
+        log(serverSourceToLogKind(data?.source), { input: text, refId: data?.refId ?? undefined })
+      } catch {
+        const r = routeFreeText(text)
         push(r.message)
+        log(r.logKind, { input: text, refId: r.refId })
+      } finally {
         setPending(false)
         inputRef.current?.focus()
-      }, 260)
+      }
     },
     [input, pending, push],
   )
