@@ -117,8 +117,10 @@ export async function POST(request: Request) {
     })
     text = (res.text ?? "").trim()
   } catch (e) {
-    console.error("chatbot ask - model error:", e instanceof Error ? e.message : e)
-    return fallback("model_error")
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error("chatbot ask - model error:", msg)
+    // 운영에서는 내부 오류를 노출하지 않고, preview/로컬에서만 진단용으로 실어보낸다
+    return fallback("model_error", process.env.VERCEL_ENV === "production" ? undefined : msg.slice(0, 300))
   }
 
   // ④-검증: 근거 문서를 대지 못한 답변은 사용자에게 내보내지 않는다
@@ -140,10 +142,11 @@ export async function POST(request: Request) {
   })
 }
 
-function fallback(reason: string) {
+function fallback(reason: string, detail?: string) {
   return NextResponse.json({
     source: "fallback",
     reason,
+    ...(detail ? { detail } : {}),
     answer: FALLBACK_ANSWER,
     actions: getActions(FALLBACK_ACTION_IDS) ?? null,
     refId: null,
