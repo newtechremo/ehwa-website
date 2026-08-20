@@ -1,7 +1,7 @@
 {
-  "tool_name": "mcp__plugin_playwright_playwright__browser_fill_form",
-  "tool_input_preview": "{\"fields\":[{\"name\":\"질문 입력\",\"type\":\"textbox\",\"ref\":\"#ehwa-chat-input\",\"value\":\"머리가 아픈데 무슨 약을 먹어야 하나요?\"}]}",
-  "error": "### Error\nInvalid arguments for tool \"browser_fill_form\":\n✖ Invalid input: expected string, received undefined\n  → at fields[0].target",
-  "timestamp": "2026-08-20T06:11:37.744Z",
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"pkill -f \\\"next dev --port 3112\\\" 2>/dev/null; pkill -f \\\"next-server\\\" 2>/dev/null; sleep 1\\necho \\\"dev 서버 종료 (필요 시 npm run dev)\\\"\\necho \\\"로컬 Supabase는 유지 중:\\\"; rtk npx supabase status 2>...",
+  "error": "Exit code 144",
+  "timestamp": "2026-08-20T07:12:39.750Z",
   "retry_count": 1
 }
