@@ -42,7 +42,7 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cat >> styles/main.css <<'EOF'\n\n/* =====================================================\n   [자체 구축 챗봇 위젯 - 고대비 모드]\n   위젯이 iframe이 아니라 사이트 DOM 내부에 있으므로\n   body.low-vision 전역 규칙을 그대로 상속받는다.\n   배경색만 명시적으로 지정해 주면 된다.\n   ===================================================== */\nbody.low-vision .chat-panel,\nbody.low-vision .chat-header,\nbody.low-vision .chat-log,\nbody.low-vision .chat-input-bar,\nbody.low-vision .chat-bubble-bot,\nbody.low-vision .chat-bubble-user {\n  background-color: #000 !important;\n  color: #fff !important;\n}\n\nbody.low-vision .chat-bubble-bot,\nbody.low-vision .chat-bubble-user {\n  border: 2px solid #00ffff !important;\n}\n\n/* 조작 가능한 요소는 노란색 계열로 (A11yBar 활성 버튼과 동일 규칙) */\nbody.low-vision .chat-launcher,\nbody.low-vision .chat-quick-reply,\nbody.low-vision .chat-action-card {\n  background-color: #000 !important;\n  color: #ffe812 !important;\n  border: 2px solid #ffe812 !important;\n}\n\nbody.low-vision .chat-launcher span,\nbody.low-vision .chat-quick-reply span,\nbody.low-vision .chat-action-card span,\nbody.low-vision .chat-action-hint {\n  color: #ffe812 !important;\n}\n\nbody.low-vision .chat-input-bar input {\n  background-color: #000 !important;\n  color: #fff !important;\n  border: 2px solid #00ffff !important;\n}\n\nbody.low-vision .chat-pending {\n  color: #fff !important;\n}\nEOF\necho \"main.css 확장 완료\"; npm run build 2>&1 | grep -E \"Compiled|Failed|error|Error|✓|chatbot|route\" | head -20",
+    "buildCommand": "python3 - <<'PY'\np = \"components/chat/ChatWidget.tsx\"\ns = open(p, encoding=\"utf-8\").read()\n\n# 1) 모바일 풀스크린 시 A11yBar(z-2000)가 채팅 헤더를 덮는 문제.\n#    패널은 aria-modal이므로 페이지 위에 오는 것이 맞다.\nold = 'className=\"chat-widget-root fixed bottom-0 right-0 z-[1900]\"'\nnew = 'className=\"chat-widget-root fixed bottom-0 right-0 z-[2100]\"'\nassert old in s\ns = s.replace(old, new)\n\n# 2) 좁은 화면에서 \"보내기\" 글자가 세로로 줄바꿈되던 문제\nold_btn = 'className=\"flex min-h-[2.75rem] min-w-[2.75rem] items-center justify-center rounded-full bg-[#004c28] px-4 text-[0.9375rem] font-bold text-white disabled:opacity-40'\nnew_btn = 'className=\"flex min-h-[2.75rem] shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-[#004c28] px-4 text-[0.9375rem] font-bold text-white disabled:opacity-40'\nassert old_btn in s\ns = s.replace(old_btn, new_btn)\n\n# 입력창이 버튼을 밀어내지 않도록 최소폭 해제\nold_in = 'className=\"min-h-[2.75rem] flex-1 rounded-full border-2 border-[#dfe5e2] px-4'\nnew_in = 'className=\"min-h-[2.75rem] w-0 flex-1 rounded-full border-2 border-[#dfe5e2] px-4'\nassert old_in in s\ns = s.replace(old_in, new_in)\n\nopen(p, \"w\", encoding=\"utf-8\").write(s)\nprint(\"ChatWidget.tsx: z-index 2100, 보내기 버튼 줄바꿈 방지\")\nPY\nnpm run build 2>&1 | grep -E \"Compiled successfully|Failed|Error:\" | head -3\ntimeout 300 npx vercel@54 --scope remo-dev --yes 2>&1 | grep -oE 'https://[a-z0-9-]+\\.vercel\\.app' | tail -1",
     "testCommand": null,
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
@@ -348,6 +348,18 @@
       "path": "live-home.png",
       "accessCount": 1,
       "lastAccessed": 1787116422944,
+      "type": "file"
+    },
+    {
+      "path": "chat-mobile.png",
+      "accessCount": 1,
+      "lastAccessed": 1787206528743,
+      "type": "file"
+    },
+    {
+      "path": "chat-mobile-fixed.png",
+      "accessCount": 1,
+      "lastAccessed": 1787206627914,
       "type": "file"
     }
   ],

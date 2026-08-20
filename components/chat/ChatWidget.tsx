@@ -147,7 +147,7 @@ export function ChatWidget() {
   if (hidden || process.env.NEXT_PUBLIC_CHATBOT_ENABLED !== "true") return null
 
   return (
-    <div className="chat-widget-root fixed bottom-0 right-0 z-[1900]">
+    <div className="chat-widget-root fixed bottom-0 right-0 z-[2100]">
       {/* 런처 */}
       <button
         ref={launcherRef}
@@ -259,12 +259,12 @@ export function ChatWidget() {
               maxLength={MAX_INPUT}
               autoComplete="off"
               placeholder="궁금한 점을 입력해 주세요"
-              className="min-h-[2.75rem] flex-1 rounded-full border-2 border-[#dfe5e2] px-4 text-[0.9375rem] text-[#1a1a1a] focus-visible:border-[#004c28] focus-visible:outline-none"
+              className="min-h-[2.75rem] w-0 flex-1 rounded-full border-2 border-[#dfe5e2] px-4 text-[0.9375rem] text-[#1a1a1a] focus-visible:border-[#004c28] focus-visible:outline-none"
             />
             <button
               type="submit"
               disabled={!input.trim() || pending}
-              className="flex min-h-[2.75rem] min-w-[2.75rem] items-center justify-center rounded-full bg-[#004c28] px-4 text-[0.9375rem] font-bold text-white disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#004c28]"
+              className="flex min-h-[2.75rem] shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-[#004c28] px-4 text-[0.9375rem] font-bold text-white disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#004c28]"
             >
               보내기
             </button>
