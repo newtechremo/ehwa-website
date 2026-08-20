@@ -1,4 +1,5 @@
 import type { ChatAction, ChatFaq, ChatNode, ChatPolicy } from "./types"
+import { GENERATED_FAQS } from "./faqs.generated"
 
 // 챗봇 콘텐츠 원본.
 // Phase A에서는 타입 검사와 git 버전관리를 받도록 코드로 둔다.
@@ -156,7 +157,12 @@ export const NODES: ChatNode[] = [
 // FAQ — 랜딩페이지 FaqSection 5건 + 인수인계 문서에 명시된 유사질문
 // (원본 44건은 faq_upload_template Excel 수령 후 확장)
 // ─────────────────────────────────────────────────────────
-export const FAQS: ChatFaq[] = [
+/**
+ * 랜딩페이지(FaqSection) 카피 기준 보완 항목.
+ * 원본 44건이 다루지 않거나 표현이 다른 주제만 남긴다.
+ * 원본과 주제가 겹치면 원본이 더 상세하므로 여기서 제거한다.
+ */
+const MANUAL_FAQS: ChatFaq[] = [
   {
     id: "faq-cost-free",
     category: "비용문의",
@@ -201,23 +207,6 @@ export const FAQS: ChatFaq[] = [
       "병원에 도착하시면 그때부터 직원이 마중 나가서 진료를 돕습니다.",
   },
   {
-    id: "faq-sameday",
-    category: "당일신청",
-    questions: [
-      "오늘 당장 이용할 수 있나요?",
-      "지금 병원 가는데 바로 신청돼요?",
-      "예약 안 했는데 오늘 도와줄 수 있나요?",
-      "당일 접수 받아주나요?",
-      "며칠 전에 신청해야 하나요?",
-    ],
-    keywords: ["오늘", "당일", "당장", "바로", "지금", "며칠 전", "미리"],
-    answer:
-      "가급적 **3일 전에 미리 신청**해 주세요.\n" +
-      "당일 신청은 다른 환자분의 예약 일정으로 어려울 수 있습니다.\n" +
-      "급한 경우라면 전화로 먼저 확인해 주세요.",
-    actionIds: ["tel"],
-  },
-  {
     id: "faq-alone",
     category: "보호자",
     questions: [
@@ -243,21 +232,6 @@ export const FAQS: ChatFaq[] = [
     answer:
       "네, **원내 전담 수어통역사**가 전 진료 과정을 함께합니다.\n" +
       "글자판(필담), 그림판(AAC) 등 다양한 의사소통 방식도 활용해요.",
-  },
-  {
-    id: "faq-apply-how",
-    category: "신청방법",
-    questions: [
-      "어떻게 신청하나요?",
-      "신청 방법 알려주세요",
-      "어디서 신청해요?",
-      "신청하려면 뭘 해야 하나요?",
-    ],
-    keywords: ["신청", "접수", "예약", "어떻게"],
-    answer:
-      "온라인 신청서, 전화, 카카오톡, 이메일, 병원 방문 중 편하신 방법으로 신청하실 수 있어요.\n" +
-      "신청하실 때 **환자 정보와 진료 예약일**을 함께 알려주시면 더 빠르게 안내해 드립니다.",
-    actionIds: ["walla", "tel", "kakao"],
   },
   {
     id: "faq-hours",
@@ -301,6 +275,13 @@ export const FAQS: ChatFaq[] = [
     actionIds: ["tel"],
   },
 ]
+
+/**
+ * 실제 서비스에 쓰는 FAQ 목록.
+ * 채널톡 업로드본 44건(생성)이 기준이고, 수기 항목은 뒤에 붙여 보완 역할만 한다.
+ * 매칭 점수가 동점이면 앞선 항목이 이기므로 원본이 우선한다.
+ */
+export const FAQS: ChatFaq[] = [...GENERATED_FAQS, ...MANUAL_FAQS]
 
 // ─────────────────────────────────────────────────────────
 // 정책 차단 — AI 이전 단계에서 코드로 걸러낸다 (프롬프트는 2차 방어선)

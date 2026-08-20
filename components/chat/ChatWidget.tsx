@@ -158,9 +158,21 @@ export function ChatWidget() {
         aria-label={open ? "상담 챗봇 닫기" : `${BOT_NAME}에게 문의하기`}
         className="chat-launcher fixed bottom-[1.125rem] right-[0.875rem] flex min-h-[3.5rem] min-w-[3.5rem] items-center gap-2 rounded-full border-2 border-white bg-[#004c28] px-4 py-3 text-[0.9375rem] font-bold text-white shadow-[0_6px_20px_rgba(0,0,0,0.25)] transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#004c28] lg:bottom-6 lg:right-6"
       >
-        <span aria-hidden="true" className="text-[1.25rem] leading-none">
-          {open ? "✕" : "💬"}
-        </span>
+        {open ? (
+          <span aria-hidden="true" className="text-[1.25rem] leading-none">
+            ✕
+          </span>
+        ) : (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src="/chatbot-launcher.png"
+            alt=""
+            aria-hidden="true"
+            width={28}
+            height={28}
+            className="h-7 w-7 shrink-0 rounded-full object-contain"
+          />
+        )}
         {!open ? <span className="hidden sm:inline">무엇이든 물어보세요</span> : null}
       </button>
 
@@ -176,11 +188,22 @@ export function ChatWidget() {
           className="chat-panel fixed inset-0 flex flex-col border-[#004c28] bg-white sm:inset-auto sm:bottom-[5.5rem] sm:right-4 sm:h-[min(37.5rem,80vh)] sm:w-[23.75rem] sm:rounded-2xl sm:border-2 sm:shadow-[0_12px_40px_rgba(0,0,0,0.25)] lg:right-6"
         >
           <header className="chat-header flex items-center justify-between gap-2 rounded-t-2xl bg-[#004c28] px-4 py-3 text-white">
-            <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/chatbot-avatar.svg"
+                alt=""
+                aria-hidden="true"
+                width={36}
+                height={36}
+                className="h-9 w-9 shrink-0 rounded-full bg-white object-contain p-0.5"
+              />
+              <div className="min-w-0">
               <p id="ehwa-chat-title" className="truncate text-[1rem] font-bold">
                 {BOT_NAME}
               </p>
               <p className="truncate text-[0.8125rem] opacity-90">{BOT_ORG}</p>
+              </div>
             </div>
             <button
               type="button"

@@ -57,25 +57,41 @@ for (const c of CASES) {
 console.log(`\n라우팅 매트릭스: ${pass}/${CASES.length} 통과`)
 if (fails.length) { console.log("실패:"); fails.forEach((f) => console.log(f)) }
 
-// FAQ 대표질문 자기매칭 (골든셋 Top-1)
+// FAQ 골든셋 — 원본 44건 + 수기 보조를 모두 포함해 전 질문 변형을 검증한다.
+// 정책 차단이 FAQ보다 우선하므로, 정책 키워드에 걸리는 질문은 집계에서 제외한다.
 const { FAQS } = await import("../lib/chatbot/content")
-let top1 = 0
+let top1 = 0, repTotal = 0
 const wrong: string[] = []
 for (const faq of FAQS) {
+  const r = routeFreeText(faq.questions[0])
+  if (r.logKind === "policy_block") continue   // 정책이 우선하는 질문은 대상 아님
+  repTotal += 1
   const m = matchFaq(faq.questions[0])
   if (m?.faq.id === faq.id) top1 += 1
   else wrong.push(`  ✗ ${faq.id} "${faq.questions[0]}" → ${m?.faq.id ?? "없음"}`)
 }
-console.log(`\nFAQ 대표질문 Top-1: ${top1}/${FAQS.length} (${Math.round((top1 / FAQS.length) * 100)}%)`)
-wrong.forEach((w) => console.log(w))
+const repPct = Math.round((top1 / repTotal) * 100)
+console.log(`\nFAQ 대표질문 Top-1: ${top1}/${repTotal} (${repPct}%)`)
+wrong.slice(0, 8).forEach((w) => console.log(w))
+if (wrong.length > 8) console.log(`  … 외 ${wrong.length - 8}건`)
 
 // 유사질문 전체 매칭
 let vTotal = 0, vPass = 0
+const vWrong: string[] = []
 for (const faq of FAQS) {
   for (const q of faq.questions.slice(1)) {
+    if (routeFreeText(q).logKind === "policy_block") continue
     vTotal += 1
     if (matchFaq(q)?.faq.id === faq.id) vPass += 1
+    else vWrong.push(`  ✗ ${faq.id} "${q.slice(0, 34)}" → ${matchFaq(q)?.faq.id ?? "없음"}`)
   }
 }
-console.log(`FAQ 유사질문 Top-1: ${vPass}/${vTotal} (${Math.round((vPass / vTotal) * 100)}%)`)
-process.exit(fails.length || wrong.length ? 1 : 0)
+const vPct = Math.round((vPass / vTotal) * 100)
+console.log(`FAQ 유사질문 Top-1: ${vPass}/${vTotal} (${vPct}%)`)
+vWrong.slice(0, 8).forEach((w) => console.log(w))
+if (vWrong.length > 8) console.log(`  … 외 ${vWrong.length - 8}건`)
+
+// 목표: 대표질문 85% 이상 (통합구현플랜 7.2)
+const TARGET = 85
+console.log(`\n목표 Top-1 ${TARGET}% — 대표질문 ${repPct >= TARGET ? "달성" : "미달"} / 유사질문 ${vPct >= TARGET ? "달성" : "미달"}`)
+process.exit(fails.length || repPct < TARGET ? 1 : 0)
