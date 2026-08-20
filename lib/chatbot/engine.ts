@@ -63,6 +63,16 @@ function matchesKeywords(rule: ChatPolicy, raw: string, norm: string): boolean {
   })
 }
 
+/** 이용자가 실제 식별정보를 입력한 경우를 낱말이 아닌 형태로 탐지한다 */
+const PII_PATTERNS = [
+  /\d{6}\s*[-–]\s*\d{7}/,                        // 주민등록번호
+  /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/,  // 카드번호
+]
+
+export function containsPII(raw: string): boolean {
+  return PII_PATTERNS.some((re) => re.test(raw))
+}
+
 const FAQ_THRESHOLD = 0.34
 const FAQ_KEYWORD_BONUS = 0.18
 
@@ -129,7 +139,9 @@ export function routeFreeText(input: string): EngineResult {
   }
 
   for (const rule of POLICIES) {
-    if (matchesKeywords(rule, raw, norm)) {
+    const hit =
+      matchesKeywords(rule, raw, norm) || (rule.id === "policy-privacy" && containsPII(raw))
+    if (hit) {
       return { message: policyMessage(rule), logKind: "policy_block", refId: rule.id }
     }
   }

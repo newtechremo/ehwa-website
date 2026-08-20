@@ -202,7 +202,7 @@ export function ChatWidget() {
             aria-relevant="additions text"
             aria-label="대화 내용"
           >
-            {messages.map((m) => (
+            {messages.map((m, idx) => (
               <div key={m.id}>
                 <div className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
                   <div
@@ -225,7 +225,7 @@ export function ChatWidget() {
                   </div>
                 ) : null}
 
-                {m.buttons?.length ? (
+                {m.buttons?.length && idx === messages.length - 1 ? (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {m.buttons.map((b) => (
                       <button

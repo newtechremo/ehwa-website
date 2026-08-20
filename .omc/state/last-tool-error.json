@@ -1,0 +1,7 @@
+{
+  "tool_name": "mcp__plugin_playwright_playwright__browser_fill_form",
+  "tool_input_preview": "{\"fields\":[{\"name\":\"질문 입력\",\"type\":\"textbox\",\"ref\":\"#ehwa-chat-input\",\"value\":\"머리가 아픈데 무슨 약을 먹어야 하나요?\"}]}",
+  "error": "### Error\nInvalid arguments for tool \"browser_fill_form\":\n✖ Invalid input: expected string, received undefined\n  → at fields[0].target",
+  "timestamp": "2026-08-20T06:11:37.744Z",
+  "retry_count": 1
+}
