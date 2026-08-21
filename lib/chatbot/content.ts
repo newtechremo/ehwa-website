@@ -78,12 +78,21 @@ export const ACTIONS: ChatAction[] = [
 // 버튼형 시나리오
 // ─────────────────────────────────────────────────────────
 /**
- * 원본 정책: "모든 답변에 '이전 단계로' 버튼 추가"
- * (「[이대목동] 장애편의_콘텐츠_랜딩페이지&챗봇_251222.xlsx」 3. 버튼형 시나리오 질문)
- * 이전 단계는 위젯이 방문 이력을 스택으로 들고 처리한다.
+ * 실제 채널톡 동작(동영상 자산 기준) 을 따른다.
+ * Excel 기획서에는 "모든 답변에 '이전 단계로' 버튼 추가"로 적혀 있으나,
+ * 실제 구현된 챗봇은 종료형 답변에 "처음으로 / 질문하기"만 노출하고
+ * 신청 흐름처럼 단계가 있는 곳에서만 "이전으로"를 보여준다.
+ * 기획서는 계획, 영상은 실제이므로 실제를 기준으로 맞춘다.
  */
-const NAV_BUTTONS = [
-  { label: "이전 단계로", goTo: "__back__" },
+/** 종료형 답변 하단 (지원범위·이용대상·비용안내 등) */
+const END_BUTTONS = [
+  { label: "처음으로", goTo: "root" },
+  { label: "질문하기", goTo: "ask" },
+]
+
+/** 단계가 있는 흐름 (신청 방법 하위 등) */
+const STEP_BUTTONS = [
+  { label: "이전으로", goTo: "__back__" },
   { label: "처음으로", goTo: "root" },
   { label: "질문하기", goTo: "ask" },
 ]
@@ -115,7 +124,7 @@ export const NODES: ChatNode[] = [
       "**2. 의사소통**\n전문 수어통역사가 진료 전 과정을 함께하며, 필담 및 그림판(AAC) 등으로 의료진과 편하게 대화하도록 돕습니다\n\n" +
       "**3. 행정·진료**\n키오스크 사용이 어렵거나 복잡한 서류 작성이 필요할 때 곁에서 도와드리고, 장애 특성을 고려해 진료 일정을 조정합니다\n\n" +
       "❌ **지원 불가 항목**\n입원 간병, 원외 이동은 지원이 불가합니다",
-    buttons: NAV_BUTTONS,
+    buttons: END_BUTTONS,
   },
   {
     id: "target",
@@ -125,7 +134,7 @@ export const NODES: ChatNode[] = [
       "• 이대목동병원이 처음이신 분\n" +
       "• 장애 정도가 중증인 분\n" +
       "• 보호자 없이 혼자 오신 분",
-    buttons: NAV_BUTTONS,
+    buttons: END_BUTTONS,
   },
   {
     id: "apply",
@@ -134,27 +143,36 @@ export const NODES: ChatNode[] = [
       "신청 시 '환자 정보'와 '진료 예약일'을 알려주셔야 합니다.",
     actionIds: ["walla"],
     buttons: [
-      { label: "카카오톡 채팅", goTo: "apply_kakao" },
+      { label: "다른 방법으로 신청", goTo: "apply_other" },
+      ...END_BUTTONS,
+    ],
+  },
+  {
+    id: "apply_other",
+    message: "아래 방법 중 편하신 방법을 선택해주세요.",
+    buttons: [
+      { label: "카카오톡", goTo: "apply_kakao" },
       { label: "전화", goTo: "apply_tel" },
       { label: "메일", goTo: "apply_mail" },
       { label: "병원 방문", goTo: "apply_visit" },
-      ...NAV_BUTTONS,
+      ...STEP_BUTTONS,
     ],
   },
   {
     id: "apply_kakao",
     message: "카카오톡 채널에서 담당직원과 1:1 채팅상담이 가능합니다.",
     actionIds: ["kakao"],
-    buttons: NAV_BUTTONS,
+    buttons: STEP_BUTTONS,
   },
   {
     id: "apply_tel",
     message:
+      // 문구는 원본 그대로. 사이트 카피(OPERATING_HOURS)와 표기가 달라 상수를 쓰지 않는다.
       "장애편의지원팀 공식 연락처입니다.\n\n" +
-      `**운영 시간**\n${OPERATING_HOURS}\n\n` +
+      "**운영 시간**\n평일 09:00 ~ 17:00 (점심 12~13시 제외)\n\n" +
       "아래 버튼을 누르면 바로 전화가 연결됩니다.",
     actionIds: ["tel"],
-    buttons: NAV_BUTTONS,
+    buttons: STEP_BUTTONS,
   },
   {
     id: "apply_mail",
@@ -162,32 +180,33 @@ export const NODES: ChatNode[] = [
       "신청서를 작성하여 아래 메일로 보내주세요.\n" +
       `📧 장애편의지원팀 : ${SUPPORT_EMAIL}`,
     actionIds: ["form", "email"],
-    buttons: NAV_BUTTONS,
+    buttons: STEP_BUTTONS,
   },
   {
     id: "apply_visit",
     message: "이대목동병원 본관 1층 접수창구로 오시면 직접 상담 및 신청이 가능합니다.",
-    buttons: NAV_BUTTONS,
+    buttons: STEP_BUTTONS,
   },
   {
     id: "cost",
     message:
       "장애인 편의지원 서비스는 국가 사업으로 전액 무료입니다.\n" +
       "(단, 병원 진료비, 검사비, 약값 등은 환자분 부담입니다.)",
-    buttons: NAV_BUTTONS,
+    buttons: END_BUTTONS,
   },
   {
     id: "hours",
-    message: `🕒 운영 시간은 ${OPERATING_HOURS} 입니다.`,
-    buttons: [{ label: "오시는 길", goTo: "directions" }, ...NAV_BUTTONS],
+    message: "🕒 운영 시간은 평일 09:00 ~ 17:00 입니다.",
+    buttons: [{ label: "오시는 길", goTo: "directions" }, ...END_BUTTONS],
   },
   {
     id: "directions",
     message:
-      `📍 **주소**: ${HOSPITAL_ADDRESS}\n\n` +
+      // 원본의 "약도 이미지 첨부 예정"은 기획 메모이므로 이용자에게 노출하지 않는다.
+      "**주소**: 서울 양천구 안양천로 1071\n\n" +
       "🚇 **지하철** : 신목동역 3번 출구 도보 15분\n" +
       "🚌 **버스** : 674번, 571번, 603번, 6620번, 6624번, 6627번, 6637번, 양천01번, 양천02번, 700번",
-    buttons: NAV_BUTTONS,
+    buttons: STEP_BUTTONS,
   },
   {
     id: "ask",
@@ -195,7 +214,7 @@ export const NODES: ChatNode[] = [
       "궁금하신 내용을 아래 입력창에 자유롭게 적어주세요.\n" +
       "제가 아는 내용이면 바로 알려드리고, 확인이 필요한 내용이면 담당자에게 연결해 드릴게요.",
     buttons: [
-      { label: "이전 단계로", goTo: "__back__" },
+      { label: "이전으로", goTo: "__back__" },
       { label: "처음으로", goTo: "root" },
     ],
   },

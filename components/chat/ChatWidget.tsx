@@ -9,8 +9,8 @@ import { ChatActionCard } from "./ChatActionCard"
 import { ChatRich } from "./ChatRich"
 
 const MAX_INPUT = 500
+/** 자유질문 답변 하단 — 실제 채널톡과 동일하게 종료형 버튼만 노출 */
 const BACK_BUTTONS: ChatButton[] = [
-  { label: "이전 단계로", goTo: BACK_NODE_ID },
   { label: "처음으로", goTo: "root" },
   { label: "질문하기", goTo: "ask" },
 ]
