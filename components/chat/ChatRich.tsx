@@ -13,6 +13,7 @@ export function ChatRich({ text }: { text: string }) {
   const lines = text.split("\n")
   const out: ReactNode[] = []
   let bullets: string[] = []
+  let tableHead: string[] = []
 
   const flushBullets = (key: string) => {
     if (!bullets.length) return
@@ -29,13 +30,49 @@ export function ChatRich({ text }: { text: string }) {
   lines.forEach((raw, i) => {
     const line = raw.trimEnd()
 
-    // 불릿: "* 내용", "- 내용", "• 내용"
-    const bullet = line.match(/^\s*[*\-•]\s+(.*)$/)
+    // 표: "| 셀 | 셀 |" — KB 원문에 1,700줄 가까이 있다.
+    // 말풍선 폭에 표를 그리면 읽기 어려워 "머리글: 값" 목록으로 편다.
+    const isTableRow = /^\s*\|.*\|\s*$/.test(line)
+    if (isTableRow) {
+      const cells = line.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim())
+      // 구분행(---|---)은 버린다
+      if (cells.every((c) => /^:?-{2,}:?$/.test(c))) return
+      if (!tableHead.length) {
+        tableHead = cells
+      } else {
+        const pairs = cells
+          .map((c, ci) => (c ? `${tableHead[ci] ? `**${tableHead[ci]}** ` : ""}${c}` : ""))
+          .filter(Boolean)
+        bullets.push(pairs.join(" · "))
+      }
+      return
+    }
+    if (tableHead.length) tableHead = []
+
+    // 불릿: "* 내용", "- 내용", "• 내용", "1. 내용"
+    const bullet = line.match(/^\s*(?:[*\-•]|\d+\.)\s+(.*)$/)
     if (bullet) {
       bullets.push(bullet[1])
       return
     }
     flushBullets(String(i))
+
+    // 인용구 "> 내용" — 참고·주의 문구에 쓰인다
+    const quote = line.match(/^\s*>\s?(.*)$/)
+    if (quote) {
+      out.push(
+        <p key={i} className="chat-quote my-1 border-l-4 border-[#004c28]/40 pl-2 text-[0.9em]">
+          {renderInline(quote[1])}
+        </p>,
+      )
+      return
+    }
+
+    // 구분선
+    if (/^\s*([-*_])\1{2,}\s*$/.test(line)) {
+      out.push(<hr key={i} className="my-2 border-[#dfe5e2]" />)
+      return
+    }
 
     // 소제목: "# ~", "## ~" → 굵은 줄로
     const head = line.match(/^\s*#{1,4}\s+(.*)$/)
