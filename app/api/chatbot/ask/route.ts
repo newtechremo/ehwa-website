@@ -7,6 +7,8 @@ import {
 } from "@/lib/chatbot/content"
 import { routeFreeText } from "@/lib/chatbot/engine"
 import { KB_CANDIDATE_THRESHOLD, KB_DIRECT_THRESHOLD, loadKb, rankKb } from "@/lib/chatbot/kb"
+import { logChat } from "@/lib/chatbot/log"
+import { resolveModel } from "@/lib/chatbot/model"
 import { checkRateLimit, clientKey, consumeDailyBudget } from "@/lib/chatbot/ratelimit"
 
 export const dynamic = "force-dynamic"
@@ -45,6 +47,7 @@ export async function POST(request: Request) {
   // ①② 정책 차단 / FAQ — 기존 엔진과 동일한 판단을 재사용한다
   const routed = routeFreeText(question)
   if (routed.logKind !== "fallback") {
+    void logChat({ sessionId, kind: routed.logKind, userInput: question, refId: routed.refId })
     return NextResponse.json({
       source: routed.message.source,
       answer: routed.message.text,
@@ -60,6 +63,10 @@ export async function POST(request: Request) {
   const best = hits[0]
 
   if (best && best.score >= KB_DIRECT_THRESHOLD) {
+    void logChat({
+      sessionId, kind: "ai_answer", userInput: question,
+      refId: best.doc.doc_key, sourceDocIds: [best.doc.doc_key],
+    })
     return NextResponse.json({
       source: "kb",
       answer: best.doc.answer,
@@ -71,10 +78,13 @@ export async function POST(request: Request) {
   }
 
   // ④ LLM — 여기서부터만 비용이 발생한다
-  const model = process.env.CHATBOT_MODEL
+  const choice = resolveModel()
   const candidates = hits.filter((h) => h.score >= KB_CANDIDATE_THRESHOLD)
 
-  if (!model || candidates.length === 0) return fallback("ai_unavailable")
+  if (!choice || candidates.length === 0) {
+    void logChat({ sessionId, kind: "fallback", userInput: question })
+    return fallback("ai_unavailable")
+  }
 
   const rl = checkRateLimit(clientKey(request, sessionId))
   if (!rl.ok) {
@@ -109,7 +119,7 @@ export async function POST(request: Request) {
   let text = ""
   try {
     const res = await generateText({
-      model,
+      model: choice.model,
       system,
       prompt: question,
       maxOutputTokens: MAX_OUTPUT_TOKENS,
@@ -124,7 +134,10 @@ export async function POST(request: Request) {
   }
 
   // ④-검증: 근거 문서를 대지 못한 답변은 사용자에게 내보내지 않는다
-  if (!text || text.includes("UNANSWERABLE")) return fallback("unanswerable")
+  if (!text || text.includes("UNANSWERABLE")) {
+    void logChat({ sessionId, kind: "fallback", userInput: question })
+    return fallback("unanswerable")
+  }
 
   const cited = candidates.map((c) => c.doc.doc_key).filter((k) => text.includes(k))
   if (cited.length === 0) return fallback("no_citation")
@@ -132,6 +145,9 @@ export async function POST(request: Request) {
   const answer = text.replace(/\[출처:[^\]]*\]/g, "").trim()
   if (!answer) return fallback("empty_after_strip")
 
+  void logChat({
+    sessionId, kind: "ai_answer", userInput: question, refId: cited[0], sourceDocIds: cited,
+  })
   return NextResponse.json({
     source: "ai",
     answer,
@@ -139,10 +155,12 @@ export async function POST(request: Request) {
     refId: cited[0],
     docIds: cited,
     usage: { used: budget.used, limit: budget.limit },
+    provider: choice.provider,
   })
 }
 
 function fallback(reason: string, detail?: string) {
+  // 호출부에서 질문·세션을 알 수 없으므로 로그는 각 분기에서 남긴다
   return NextResponse.json({
     source: "fallback",
     reason,
