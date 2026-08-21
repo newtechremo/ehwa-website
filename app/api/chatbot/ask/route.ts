@@ -6,7 +6,7 @@ import {
   getActions,
 } from "@/lib/chatbot/content"
 import { routeFreeText } from "@/lib/chatbot/engine"
-import { KB_CANDIDATE_THRESHOLD, KB_DIRECT_THRESHOLD, loadKb, rankKb } from "@/lib/chatbot/kb"
+import { KB_DIRECT_THRESHOLD, loadKb, rankKb } from "@/lib/chatbot/kb"
 import { logChat } from "@/lib/chatbot/log"
 import { resolveModel } from "@/lib/chatbot/model"
 import { checkRateLimit, clientKey, consumeDailyBudget } from "@/lib/chatbot/ratelimit"
@@ -79,9 +79,7 @@ export async function POST(request: Request) {
 
   // ④ LLM — 여기서부터만 비용이 발생한다
   const choice = resolveModel()
-  const candidates = hits.filter((h) => h.score >= KB_CANDIDATE_THRESHOLD)
-
-  if (!choice || candidates.length === 0) {
+  if (!choice) {
     void logChat({ sessionId, kind: "fallback", userInput: question })
     return fallback("ai_unavailable")
   }
@@ -97,8 +95,17 @@ export async function POST(request: Request) {
   const budget = await consumeDailyBudget()
   if (!budget.ok) return fallback("daily_limit")
 
-  const context = candidates
-    .map((h) => `[${h.doc.doc_key}]\n제목: ${h.doc.topic}\n내용:\n${h.doc.answer}`)
+  // KB 전문을 한 번에 넣는다.
+  //
+  // 2단계(라우터로 후보 선별 → 생성)를 먼저 시도했으나 구조적 한계가 있었다.
+  // 라우터에게 제목·예상질문만 보여주면 본문에만 있는 정보를 못 찾는다.
+  // 실측: "엘리베이터 어디 있어요" → NONE. 실제로는 45·57·59 문서 본문에 있다.
+  // 코퍼스가 59문서 약 21,500토큰뿐이라 전문을 매 요청에 넣어도
+  // 모델 컨텍스트의 2%이고 질문당 약 $0.0065다. 선별 단계를 없애면
+  // "검색이 못 찾아서 답을 못 하는" 실패 유형 자체가 사라진다.
+  const candidates = docs.map((doc) => ({ doc }))
+  const context = docs
+    .map((d) => `[${d.doc_key}]\n제목: ${d.topic}\n내용:\n${d.answer}`)
     .join("\n\n---\n\n")
 
   const system = [
