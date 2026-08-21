@@ -15,7 +15,13 @@ export const BRAND_COLOR = "#004c28"
 
 export const WELCOME_MESSAGE =
   "환자분과 보호자분의 든든한 동행, 이대목동병원 편의지원 매니저입니다. 😊\n" +
-  "궁금하신 내용을 아래에서 골라주세요. 직접 물어보셔도 좋아요."
+  "도움이 필요하신가요?\n" +
+  "아래 버튼을 누르거나 질문을 입력해 주세요"
+
+export const INPUT_PLACEHOLDER = "궁금한 내용을 입력해주세요 (예 : 서비스 이용일 변경)"
+
+/** 병원 대표번호 — 편의지원 범위를 벗어난 민원·행정 문의를 넘길 곳 */
+export const HOSPITAL_TEL = "1666-5000"
 
 export const OPERATING_HOURS = "평일 09:00 ~ 17:00 (점심시간 12:00 ~ 13:00)"
 export const SUPPORT_TEL = "02-2650-5586"
@@ -52,18 +58,41 @@ export const ACTIONS: ChatAction[] = [
     label: "이메일 보내기",
     value: SUPPORT_EMAIL,
   },
+  {
+    id: "form",
+    type: "link",
+    label: "신청서 서식 다운로드",
+    value:
+      "https://drive.google.com/file/d/1rxBymUZiOXcgEAcbpFApPdkeD56fjGGd/view?usp=sharing",
+    hint: "사전문진표 PDF",
+  },
+  {
+    id: "hospitalTel",
+    type: "tel",
+    label: `병원 대표번호 ${HOSPITAL_TEL}`,
+    value: HOSPITAL_TEL,
+  },
 ]
 
 // ─────────────────────────────────────────────────────────
 // 버튼형 시나리오
 // ─────────────────────────────────────────────────────────
-const BACK_BUTTONS = [
+/**
+ * 원본 정책: "모든 답변에 '이전 단계로' 버튼 추가"
+ * (「[이대목동] 장애편의_콘텐츠_랜딩페이지&챗봇_251222.xlsx」 3. 버튼형 시나리오 질문)
+ * 이전 단계는 위젯이 방문 이력을 스택으로 들고 처리한다.
+ */
+const NAV_BUTTONS = [
+  { label: "이전 단계로", goTo: "__back__" },
   { label: "처음으로", goTo: "root" },
   { label: "질문하기", goTo: "ask" },
 ]
 
+export const BACK_NODE_ID = "__back__"
 export const ROOT_NODE_ID = "root"
 
+// 답변 문구는 원본 Excel의 「A (출력 답변)」을 그대로 사용한다.
+// 랜딩페이지 카피로 임의 재작성하지 않는다 — 챗봇 문구는 별도로 검수된 자산이다.
 export const NODES: ChatNode[] = [
   {
     id: "root",
@@ -80,76 +109,95 @@ export const NODES: ChatNode[] = [
   {
     id: "scope",
     message:
-      "병원 예약부터 진료, 귀가까지 병원 이용 전 과정에서 필요한 도움을 드려요.\n\n" +
-      "🚶 **이동 · 동행 지원**\n혼자 이동하기 어려울 때 동행합니다. 휠체어 이용, 환복, 검사 중 자세 유지 등 신체 활동을 지원해요.\n\n" +
-      "🤟 **의사소통 지원**\n수어통역이 필요할 때 원내 전담 수어통역사가 전 진료 과정을 함께합니다. 글자판(필담), 그림판(AAC) 등도 활용해요.\n\n" +
-      "📝 **행정절차 지원**\n서류작성, 키오스크(무인기기) 등 복잡한 행정절차를 도와드려요. 필요하면 지역사회 복지자원과 연결해 드립니다.\n\n" +
-      "🩺 **맞춤형 진료 지원**\n장애 유형과 정도, 이동 동선을 고려해 진료 일정과 대기 절차를 조정해요. 진료 후 복약 지도와 다음 내원 절차도 안내해 드립니다.\n\n" +
-      "다만 **집에서 병원까지의 이동은 지원하지 않아요.** 병원에 도착하신 뒤부터 직원이 마중 나가 도와드립니다.",
-    buttons: BACK_BUTTONS,
+      "상담을 통해 꼭 필요한 서비스를 무료로 맞춤 지원해 드립니다.\n\n" +
+      "✅ **지원 가능 항목**\n" +
+      "**1. 이동·동행**\n원내 이동 시 전담 직원이 동행합니다. 휠체어 보조, 환복, 검사 자세 유지 등을 도와드립니다\n\n" +
+      "**2. 의사소통**\n전문 수어통역사가 진료 전 과정을 함께하며, 필담 및 그림판(AAC) 등으로 의료진과 편하게 대화하도록 돕습니다\n\n" +
+      "**3. 행정·진료**\n키오스크 사용이 어렵거나 복잡한 서류 작성이 필요할 때 곁에서 도와드리고, 장애 특성을 고려해 진료 일정을 조정합니다\n\n" +
+      "❌ **지원 불가 항목**\n입원 간병, 원외 이동은 지원이 불가합니다",
+    buttons: NAV_BUTTONS,
   },
   {
     id: "target",
     message:
-      "등록 장애인 환자분을 위한 서비스예요. 그중에서도 아래 세 가지 경우를 우선 지원해 드립니다.\n\n" +
-      "🏥 이대목동병원을 처음 방문하는 **초진 환자**\n" +
-      "♿ 장애 정도가 심한 **중증 장애인**\n" +
-      "🚶 **보호자 없이 혼자** 방문하는 분\n\n" +
-      "장애인 등록이 안 되어 있더라도 도움이 꼭 필요한 상황이라면, 센터로 전화 주시면 상담 후 안내해 드릴게요.",
-    actionIds: ["tel"],
-    buttons: BACK_BUTTONS,
+      "병원 이용에 도움이 필요한 '등록 장애인'이라면 누구나 가능합니다.\n\n" +
+      "🌟 **우선 지원 대상**\n" +
+      "• 이대목동병원이 처음이신 분\n" +
+      "• 장애 정도가 중증인 분\n" +
+      "• 보호자 없이 혼자 오신 분",
+    buttons: NAV_BUTTONS,
   },
   {
     id: "apply",
     message:
-      "신청은 어렵지 않아요. 진행은 이렇게 이어집니다.\n\n" +
-      "**STEP 01 서비스 신청** — 편의지원 서비스를 신청합니다.\n" +
-      "**STEP 02 사전 상담** — 상담을 통해 필요한 도움을 확인하고 서비스 예약을 확정합니다.\n" +
-      "**STEP 03 병원 내원** — 요청하신 서비스와 함께 진료를 받습니다.\n" +
-      "**STEP 04 귀가 지원** — 진료 후 복약지도 및 다음 서비스 예약을 도와드립니다.\n\n" +
-      "신청하실 때 **환자 정보와 진료 예약일**을 함께 알려주시면 더 빠르게 안내해 드릴 수 있어요.\n" +
-      "가급적 **진료 3일 전**에 미리 신청해 주세요.",
+      "편하신 방법으로 신청해 주세요. (진료 3일 전 권장)\n" +
+      "신청 시 '환자 정보'와 '진료 예약일'을 알려주셔야 합니다.",
     actionIds: ["walla"],
     buttons: [
-      { label: "다른 방법으로 신청", goTo: "apply_other" },
-      { label: "처음으로", goTo: "root" },
-      { label: "질문하기", goTo: "ask" },
+      { label: "카카오톡 채팅", goTo: "apply_kakao" },
+      { label: "전화", goTo: "apply_tel" },
+      { label: "메일", goTo: "apply_mail" },
+      { label: "병원 방문", goTo: "apply_visit" },
+      ...NAV_BUTTONS,
     ],
   },
   {
-    id: "apply_other",
+    id: "apply_kakao",
+    message: "카카오톡 채널에서 담당직원과 1:1 채팅상담이 가능합니다.",
+    actionIds: ["kakao"],
+    buttons: NAV_BUTTONS,
+  },
+  {
+    id: "apply_tel",
     message:
-      "편하신 방법으로 연락해 주시면 됩니다. 어떤 방법이든 동일하게 신청하실 수 있어요.\n\n" +
-      `📞 **전화** ${SUPPORT_TEL} (${OPERATING_HOURS})\n` +
-      "💛 **카카오톡** 편의지원팀 채널로 상담\n" +
-      `✉️ **이메일** ${SUPPORT_EMAIL}\n` +
-      `🏥 **병원 방문** ${HOSPITAL_ADDRESS}`,
-    actionIds: ["tel", "kakao", "email"],
-    buttons: BACK_BUTTONS,
+      "장애편의지원팀 공식 연락처입니다.\n\n" +
+      `**운영 시간**\n${OPERATING_HOURS}\n\n` +
+      "아래 버튼을 누르면 바로 전화가 연결됩니다.",
+    actionIds: ["tel"],
+    buttons: NAV_BUTTONS,
+  },
+  {
+    id: "apply_mail",
+    message:
+      "신청서를 작성하여 아래 메일로 보내주세요.\n" +
+      `📧 장애편의지원팀 : ${SUPPORT_EMAIL}`,
+    actionIds: ["form", "email"],
+    buttons: NAV_BUTTONS,
+  },
+  {
+    id: "apply_visit",
+    message: "이대목동병원 본관 1층 접수창구로 오시면 직접 상담 및 신청이 가능합니다.",
+    buttons: NAV_BUTTONS,
   },
   {
     id: "cost",
     message:
-      "네, **편의지원 서비스는 모두 무료**입니다. 😊\n\n" +
-      "이동 동행, 수어 통역, 행정절차 지원 등 지원 서비스에는 비용이 들지 않아요.\n" +
-      "다만 **진료비, 검사비, 약값은 본인 부담**이라는 점만 참고해 주세요.",
-    buttons: BACK_BUTTONS,
+      "장애인 편의지원 서비스는 국가 사업으로 전액 무료입니다.\n" +
+      "(단, 병원 진료비, 검사비, 약값 등은 환자분 부담입니다.)",
+    buttons: NAV_BUTTONS,
   },
   {
     id: "hours",
+    message: `🕒 운영 시간은 ${OPERATING_HOURS} 입니다.`,
+    buttons: [{ label: "오시는 길", goTo: "directions" }, ...NAV_BUTTONS],
+  },
+  {
+    id: "directions",
     message:
-      `🕘 **운영시간**\n${OPERATING_HOURS}\n\n` +
-      `📍 **위치**\n${BOT_ORG}\n${HOSPITAL_ADDRESS}\n\n` +
-      `문의는 ${SUPPORT_TEL} 로 주시면 됩니다.`,
-    actionIds: ["tel"],
-    buttons: BACK_BUTTONS,
+      `📍 **주소**: ${HOSPITAL_ADDRESS}\n\n` +
+      "🚇 **지하철** : 신목동역 3번 출구 도보 15분\n" +
+      "🚌 **버스** : 674번, 571번, 603번, 6620번, 6624번, 6627번, 6637번, 양천01번, 양천02번, 700번",
+    buttons: NAV_BUTTONS,
   },
   {
     id: "ask",
     message:
       "궁금하신 내용을 아래 입력창에 자유롭게 적어주세요.\n" +
       "제가 아는 내용이면 바로 알려드리고, 확인이 필요한 내용이면 담당자에게 연결해 드릴게요.",
-    buttons: [{ label: "처음으로", goTo: "root" }],
+    buttons: [
+      { label: "이전 단계로", goTo: "__back__" },
+      { label: "처음으로", goTo: "root" },
+    ],
   },
 ]
 

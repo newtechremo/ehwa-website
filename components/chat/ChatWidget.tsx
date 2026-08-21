@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { usePathname } from "next/navigation"
-import { BOT_NAME, BOT_ORG, ROOT_NODE_ID } from "@/lib/chatbot/content"
+import { BACK_NODE_ID, BOT_NAME, BOT_ORG, INPUT_PLACEHOLDER, ROOT_NODE_ID } from "@/lib/chatbot/content"
 import { routeFreeText, routeNode, userMessage } from "@/lib/chatbot/engine"
 import type { ChatButton, ChatMessage, LogKind } from "@/lib/chatbot/types"
 import { ChatActionCard } from "./ChatActionCard"
@@ -10,6 +10,7 @@ import { ChatRich } from "./ChatRich"
 
 const MAX_INPUT = 500
 const BACK_BUTTONS: ChatButton[] = [
+  { label: "이전 단계로", goTo: BACK_NODE_ID },
   { label: "처음으로", goTo: "root" },
   { label: "질문하기", goTo: "ask" },
 ]
@@ -70,6 +71,8 @@ export function ChatWidget() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [pending, setPending] = useState(false)
+  // "이전 단계로" 는 방문 이력을 되짚는다 (원본 정책: 모든 답변에 이전 단계 버튼)
+  const [nodeHistory, setNodeHistory] = useState<string[]>([])
 
   const panelRef = useRef<HTMLDivElement>(null)
   const launcherRef = useRef<HTMLButtonElement>(null)
@@ -83,7 +86,10 @@ export function ChatWidget() {
   useEffect(() => {
     if (open && messages.length === 0) {
       const r = routeNode(ROOT_NODE_ID)
-      if (r) setMessages([r.message])
+      if (r) {
+        setMessages([r.message])
+        setNodeHistory([ROOT_NODE_ID])
+      }
     }
   }, [open, messages.length])
 
@@ -129,9 +135,20 @@ export function ChatWidget() {
 
   const handleButton = useCallback(
     (btn: ChatButton) => {
-      push(userMessage(btn.label))
       if (!btn.goTo) return
-      const r = routeNode(btn.goTo)
+      push(userMessage(btn.label))
+
+      let target = btn.goTo
+      if (target === BACK_NODE_ID) {
+        // 직전 노드로. 이력이 비면 처음으로 돌아간다.
+        const prev = nodeHistory[nodeHistory.length - 2] ?? ROOT_NODE_ID
+        setNodeHistory((h) => (h.length > 1 ? h.slice(0, -1) : [ROOT_NODE_ID]))
+        target = prev
+      } else {
+        setNodeHistory((h) => (h[h.length - 1] === target ? h : h.concat(target)))
+      }
+
+      const r = routeNode(target)
       if (!r) return
       log("button", { refId: r.refId })
       setPending(true)
@@ -141,7 +158,7 @@ export function ChatWidget() {
         setPending(false)
       }, 220)
     },
-    [push],
+    [push, nodeHistory],
   )
 
   const handleSubmit = useCallback(
@@ -320,7 +337,7 @@ export function ChatWidget() {
               onChange={(e) => setInput(e.target.value.slice(0, MAX_INPUT))}
               maxLength={MAX_INPUT}
               autoComplete="off"
-              placeholder="궁금한 점을 입력해 주세요"
+              placeholder={INPUT_PLACEHOLDER}
               className="min-h-[2.75rem] w-0 flex-1 rounded-full border-2 border-[#dfe5e2] px-4 text-[0.9375rem] text-[#1a1a1a] focus-visible:border-[#004c28] focus-visible:outline-none"
             />
             <button

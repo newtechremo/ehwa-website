@@ -832,3 +832,10 @@ body.low-vision .chat-input-bar input {
 body.low-vision .chat-pending {
   color: #fff !important;
 }
+
+/* 채팅 패널은 열릴 때 스크린리더 문맥을 위해 프로그래밍 포커스를 받는다.
+   키보드로 도달한 요소가 아니므로 전역 포커스 링(3px #ffd700)을 그리지 않는다.
+   패널 내부의 버튼·링크·입력창은 각자 포커스 링을 유지한다. */
+.chat-panel:focus {
+  outline: none !important;
+}
