@@ -18,6 +18,25 @@ export const maxDuration = 30
 
 const MAX_INPUT = 500
 const MAX_OUTPUT_TOKENS = 700
+/** 직전 대화만 참고한다. 길어지면 비용·지연이 늘고 오래된 맥락이 답변을 흐린다 */
+const MAX_HISTORY_TURNS = 4
+const MAX_HISTORY_CHARS = 300
+
+type Turn = { role: "user" | "assistant"; text: string }
+
+function readHistory(body: unknown): Turn[] {
+  const raw = (body as { history?: unknown })?.history
+  if (!Array.isArray(raw)) return []
+  const turns: Turn[] = []
+  for (const t of raw.slice(-MAX_HISTORY_TURNS)) {
+    const role = (t as Turn)?.role
+    const text = String((t as Turn)?.text ?? "").trim()
+    if ((role === "user" || role === "assistant") && text) {
+      turns.push({ role, text: text.slice(0, MAX_HISTORY_CHARS) })
+    }
+  }
+  return turns
+}
 
 /**
  * 자유질문 처리.
@@ -35,10 +54,12 @@ const MAX_OUTPUT_TOKENS = 700
 export async function POST(request: Request) {
   let question = ""
   let sessionId = "unknown"
+  let history: Turn[] = []
   try {
     const body = await request.json()
     question = String(body?.question ?? "").trim().slice(0, MAX_INPUT)
     sessionId = String(body?.sessionId ?? "unknown").slice(0, 64)
+    history = readHistory(body)
   } catch {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 })
   }
@@ -104,8 +125,10 @@ export async function POST(request: Request) {
   // 모델 컨텍스트의 2%이고 질문당 약 $0.0065다. 선별 단계를 없애면
   // "검색이 못 찾아서 답을 못 하는" 실패 유형 자체가 사라진다.
   const candidates = docs.map((doc) => ({ doc }))
+  // 문서 번호로 라벨링한다. 근거 표기를 긴 한글 문서키로 요구하면 모델이
+  // 정확히 되풀이하지 못해 검증에서 탈락하는 일이 잦다(실측: no_citation 다발).
   const context = docs
-    .map((d) => `[${d.doc_key}]\n제목: ${d.topic}\n내용:\n${d.answer}`)
+    .map((d) => `<문서 ${d.seq}> ${d.topic}\n${d.answer}`)
     .join("\n\n---\n\n")
 
   const system = [
@@ -116,8 +139,10 @@ export async function POST(request: Request) {
     "1. 아래 [참고 문서]에 있는 내용만으로 답하세요. 문서에 없으면 추측하지 마세요.",
     "2. 의학적 진단·처방·치료 판단은 절대 하지 마세요.",
     "3. 전화번호·운영시간·주소·비용은 문서에 적힌 값을 그대로 쓰고 절대 지어내지 마세요.",
-    "4. 답변 마지막 줄에 반드시 근거 문서 키를 `[출처: 문서키]` 형식으로 표기하세요.",
-    "5. 참고 문서로 답할 수 없으면 답변 대신 정확히 `UNANSWERABLE` 만 출력하세요.",
+    "4. 답변 마지막 줄에 반드시 근거 문서 번호를 `[출처: 12]` 형식으로 표기하세요. 여러 개면 `[출처: 12, 34]`.",
+    "5. 참고 문서로 답할 수 없으면 사과나 설명 없이 정확히 `UNANSWERABLE` 한 단어만 출력하세요.",
+    "   '정보가 없습니다' 같은 문장을 직접 쓰지 마세요. 안내는 시스템이 대신합니다.",
+    "6. 질문이 편의지원·병원 이용과 무관하면(날씨·요리·투자 등) 역시 `UNANSWERABLE` 만 출력하세요.",
     "",
     "[참고 문서]",
     context,
@@ -128,7 +153,10 @@ export async function POST(request: Request) {
     const res = await generateText({
       model: choice.model,
       system,
-      prompt: question,
+      messages: [
+        ...history.map((t) => ({ role: t.role, content: t.text }) as const),
+        { role: "user" as const, content: question },
+      ],
       maxOutputTokens: MAX_OUTPUT_TOKENS,
       temperature: 0.2,
     })
@@ -146,10 +174,36 @@ export async function POST(request: Request) {
     return fallback("unanswerable")
   }
 
-  const cited = candidates.map((c) => c.doc.doc_key).filter((k) => text.includes(k))
-  if (cited.length === 0) return fallback("no_citation")
+  // 모델이 UNANSWERABLE 대신 거절 문장을 쓰는 경우가 있다(실측: "정보가 없어
+  // 답변드릴 수 없습니다"). 그대로 내보내면 담당자 연결 카드가 빠져 이용자가
+  // 다음 행동을 못 한다. 거절로 판정해 표준 fallback으로 돌린다.
+  const REFUSAL = /(정보(가|는)?\s*(없|가지고 있지 않))|((답변|안내)(을|를)?\s*(드릴|해 드릴)?\s*수\s*없)|(확인(이|해)?\s*어렵)/
+  if (REFUSAL.test(text)) {
+    void logChat({ sessionId, kind: "fallback", userInput: question })
+    return fallback("model_refused")
+  }
 
-  const answer = text.replace(/\[출처:[^\]]*\]/g, "").trim()
+  const seqs = new Set<number>()
+  for (const m of text.matchAll(/\[?\s*출처\s*[::]\s*([0-9,\s]+)\]?/g)) {
+    for (const n of m[1].split(",")) {
+      const v = Number(n.trim())
+      if (Number.isInteger(v)) seqs.add(v)
+    }
+  }
+  const cited = docs.filter((d) => seqs.has(d.seq)).map((d) => d.doc_key)
+  if (cited.length === 0) {
+    void logChat({ sessionId, kind: "fallback", userInput: question })
+    return fallback("no_citation")
+  }
+
+  // 모델이 [출처: X] / 출처: [X] / 출처: X 등으로 다양하게 쓰므로 모두 걷어낸다.
+  // 남은 홀괄호까지 정리하지 않으면 말풍선 끝에 "]" 같은 찌꺼기가 보인다(실측).
+  const answer = text
+    .replace(/\[?\s*출처\s*[::][^\]\n]*\]?/g, "")
+    .replace(/^\s*[\]\[)(]\s*$/gm, "")
+    .replace(/[\]\[]\s*$/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
   if (!answer) return fallback("empty_after_strip")
 
   void logChat({

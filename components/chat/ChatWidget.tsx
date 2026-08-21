@@ -173,10 +173,20 @@ export function ChatWidget() {
       // 서버가 정책 → FAQ → KB 검색 → AI → fallback 순으로 판단한다.
       // 서버가 응답하지 못하면 클라이언트 엔진(정책·FAQ)만으로 즉시 대응한다.
       try {
+        // 직전 대화만 보낸다. 길게 보내면 비용·지연이 늘고 오래된 맥락이 답변을 흐린다.
+        // 버튼으로 출력된 안내문은 맥락으로 쓰지 않고, 사람이 쓴 질문과 답변만 보낸다.
+        const history = messages
+          .filter((m) => m.role === "user" || m.source === "ai" || m.source === "faq")
+          .slice(-4)
+          .map((m) => ({
+            role: m.role === "user" ? ("user" as const) : ("assistant" as const),
+            text: m.text.slice(0, 300),
+          }))
+
         const res = await fetch("/api/chatbot/ask", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: text, sessionId: getSessionId() }),
+          body: JSON.stringify({ question: text, sessionId: getSessionId(), history }),
         })
         const data = await res.json()
         push({
@@ -197,7 +207,7 @@ export function ChatWidget() {
         inputRef.current?.focus()
       }
     },
-    [input, pending, push],
+    [input, pending, push, messages],
   )
 
   if (hidden || process.env.NEXT_PUBLIC_CHATBOT_ENABLED !== "true") return null
