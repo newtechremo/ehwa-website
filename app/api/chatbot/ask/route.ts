@@ -50,8 +50,12 @@ function readHistory(body: unknown): Turn[] {
  *
  * ④는 rate limit·일일 서킷브레이커 뒤에 있고, 한도를 넘거나 모델이 없으면
  * 조용히 ⑤로 강등된다. 즉 AI가 죽어도 챗봇은 계속 동작한다.
+ *
+ * 모든 분기는 "이용자에게 실제로 내보낸 답변"을 로그에 남긴다. 근거 문서 ID만
+ * 남기면 매번 새로 생성되는 AI 답변을 복원할 수 없어 사후 확인이 불가능하다.
  */
 export async function POST(request: Request) {
+  const startedAt = Date.now()
   let question = ""
   let sessionId = "unknown"
   let history: Turn[] = []
@@ -65,10 +69,42 @@ export async function POST(request: Request) {
   }
   if (!question) return NextResponse.json({ error: "질문이 비어 있습니다." }, { status: 400 })
 
+  /**
+   * fallback 응답 생성 + 로깅을 한 곳에 묶는다.
+   * 이전에는 분기마다 logChat 을 따로 불러서 일부 경로(daily_limit, empty_after_strip)가
+   * 로그 없이 빠져나갔다. 응답과 로그를 분리하면 반드시 다시 어긋난다.
+   */
+  const fallback = (reason: string, detail?: string) => {
+    void logChat({
+      sessionId,
+      kind: "fallback",
+      userInput: question,
+      answer: FALLBACK_ANSWER,
+      fallbackReason: reason,
+      latencyMs: Date.now() - startedAt,
+    })
+    return NextResponse.json({
+      source: "fallback",
+      reason,
+      ...(detail ? { detail } : {}),
+      answer: FALLBACK_ANSWER,
+      actions: getActions(FALLBACK_ACTION_IDS) ?? null,
+      refId: null,
+      docIds: [],
+    })
+  }
+
   // ①② 정책 차단 / FAQ — 기존 엔진과 동일한 판단을 재사용한다
   const routed = routeFreeText(question)
   if (routed.logKind !== "fallback") {
-    void logChat({ sessionId, kind: routed.logKind, userInput: question, refId: routed.refId })
+    void logChat({
+      sessionId,
+      kind: routed.logKind,
+      userInput: question,
+      answer: routed.message.text,
+      refId: routed.refId,
+      latencyMs: Date.now() - startedAt,
+    })
     return NextResponse.json({
       source: routed.message.source,
       answer: routed.message.text,
@@ -86,7 +122,10 @@ export async function POST(request: Request) {
   if (best && best.score >= KB_DIRECT_THRESHOLD) {
     void logChat({
       sessionId, kind: "ai_answer", userInput: question,
+      answer: best.doc.answer,
       refId: best.doc.doc_key, sourceDocIds: [best.doc.doc_key],
+      provider: "kb-direct",
+      latencyMs: Date.now() - startedAt,
     })
     return NextResponse.json({
       source: "kb",
@@ -100,10 +139,7 @@ export async function POST(request: Request) {
 
   // ④ LLM — 여기서부터만 비용이 발생한다
   const choice = resolveModel()
-  if (!choice) {
-    void logChat({ sessionId, kind: "fallback", userInput: question })
-    return fallback("ai_unavailable")
-  }
+  if (!choice) return fallback("ai_unavailable")
 
   const rl = checkRateLimit(clientKey(request, sessionId))
   if (!rl.ok) {
@@ -124,7 +160,7 @@ export async function POST(request: Request) {
   // 코퍼스가 59문서 약 21,500토큰뿐이라 전문을 매 요청에 넣어도
   // 모델 컨텍스트의 2%이고 질문당 약 $0.0065다. 선별 단계를 없애면
   // "검색이 못 찾아서 답을 못 하는" 실패 유형 자체가 사라진다.
-  const candidates = docs.map((doc) => ({ doc }))
+  //
   // 문서 번호로 라벨링한다. 근거 표기를 긴 한글 문서키로 요구하면 모델이
   // 정확히 되풀이하지 못해 검증에서 탈락하는 일이 잦다(실측: no_citation 다발).
   const context = docs
@@ -153,6 +189,11 @@ export async function POST(request: Request) {
   ].join("\n")
 
   let text = ""
+  let usage: {
+    tokensIn?: number | null
+    tokensOut?: number | null
+    tokensCached?: number | null
+  } = {}
   try {
     const res = await generateText({
       model: choice.model,
@@ -165,6 +206,12 @@ export async function POST(request: Request) {
       temperature: 0.2,
     })
     text = (res.text ?? "").trim()
+    usage = {
+      tokensIn: res.usage?.inputTokens ?? null,
+      tokensOut: res.usage?.outputTokens ?? null,
+      // 암시적 컨텍스트 캐시 적중분. 이 값이 떨어지면 비용이 조용히 4배가 된다.
+      tokensCached: res.usage?.inputTokenDetails?.cacheReadTokens ?? null,
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error("chatbot ask - model error:", msg)
@@ -173,19 +220,13 @@ export async function POST(request: Request) {
   }
 
   // ④-검증: 근거 문서를 대지 못한 답변은 사용자에게 내보내지 않는다
-  if (!text || text.includes("UNANSWERABLE")) {
-    void logChat({ sessionId, kind: "fallback", userInput: question })
-    return fallback("unanswerable")
-  }
+  if (!text || text.includes("UNANSWERABLE")) return fallback("unanswerable")
 
   // 모델이 UNANSWERABLE 대신 거절 문장을 쓰는 경우가 있다(실측: "정보가 없어
   // 답변드릴 수 없습니다"). 그대로 내보내면 담당자 연결 카드가 빠져 이용자가
   // 다음 행동을 못 한다. 거절로 판정해 표준 fallback으로 돌린다.
   const REFUSAL = /(정보(가|는)?\s*(없|가지고 있지 않))|((답변|안내)(을|를)?\s*(드릴|해 드릴)?\s*수\s*없)|(확인(이|해)?\s*어렵)/
-  if (REFUSAL.test(text)) {
-    void logChat({ sessionId, kind: "fallback", userInput: question })
-    return fallback("model_refused")
-  }
+  if (REFUSAL.test(text)) return fallback("model_refused")
 
   const seqs = new Set<number>()
   for (const m of text.matchAll(/\[?\s*출처\s*[::]\s*([0-9,\s]+)\]?/g)) {
@@ -195,10 +236,7 @@ export async function POST(request: Request) {
     }
   }
   const cited = docs.filter((d) => seqs.has(d.seq)).map((d) => d.doc_key)
-  if (cited.length === 0) {
-    void logChat({ sessionId, kind: "fallback", userInput: question })
-    return fallback("no_citation")
-  }
+  if (cited.length === 0) return fallback("no_citation")
 
   // 모델이 [출처: X] / 출처: [X] / 출처: X 등으로 다양하게 쓰므로 모두 걷어낸다.
   // 남은 홀괄호까지 정리하지 않으면 말풍선 끝에 "]" 같은 찌꺼기가 보인다(실측).
@@ -211,7 +249,12 @@ export async function POST(request: Request) {
   if (!answer) return fallback("empty_after_strip")
 
   void logChat({
-    sessionId, kind: "ai_answer", userInput: question, refId: cited[0], sourceDocIds: cited,
+    sessionId, kind: "ai_answer", userInput: question,
+    answer,
+    refId: cited[0], sourceDocIds: cited,
+    provider: choice.provider, model: choice.id,
+    latencyMs: Date.now() - startedAt,
+    ...usage,
   })
   return NextResponse.json({
     source: "ai",
@@ -221,18 +264,5 @@ export async function POST(request: Request) {
     docIds: cited,
     usage: { used: budget.used, limit: budget.limit },
     provider: choice.provider,
-  })
-}
-
-function fallback(reason: string, detail?: string) {
-  // 호출부에서 질문·세션을 알 수 없으므로 로그는 각 분기에서 남긴다
-  return NextResponse.json({
-    source: "fallback",
-    reason,
-    ...(detail ? { detail } : {}),
-    answer: FALLBACK_ANSWER,
-    actions: getActions(FALLBACK_ACTION_IDS) ?? null,
-    refId: null,
-    docIds: [],
   })
 }

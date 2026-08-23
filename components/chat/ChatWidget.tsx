@@ -16,19 +16,6 @@ const BACK_BUTTONS: ChatButton[] = [
 ]
 const FALLBACK_TEXT = "답변을 가져오지 못했어요. 편의지원팀으로 문의해 주세요."
 
-function serverSourceToLogKind(source: string | undefined): LogKind {
-  switch (source) {
-    case "policy":
-      return "policy_block"
-    case "faq":
-      return "faq_hit"
-    case "kb":
-    case "ai":
-      return "ai_answer"
-    default:
-      return "fallback"
-  }
-}
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
@@ -47,7 +34,7 @@ function getSessionId(): string {
 }
 
 /** 로그는 실패해도 대화를 막지 않는다 (fire-and-forget) */
-function log(kind: LogKind, opts: { input?: string; refId?: string }) {
+function log(kind: LogKind, opts: { input?: string; refId?: string; offline?: boolean }) {
   try {
     void fetch("/api/chatbot/log", {
       method: "POST",
@@ -57,6 +44,7 @@ function log(kind: LogKind, opts: { input?: string; refId?: string }) {
         kind,
         userInput: opts.input,
         refId: opts.refId,
+        offline: opts.offline ?? false,
       }),
       keepalive: true,
     }).catch(() => {})
@@ -197,11 +185,12 @@ export function ChatWidget() {
           actions: data?.actions ?? undefined,
           buttons: BACK_BUTTONS,
         })
-        log(serverSourceToLogKind(data?.source), { input: text, refId: data?.refId ?? undefined })
+        // 서버 로깅 없음: /api/chatbot/ask 가 답변 본문·근거까지 직접 남긴다.
+        // 여기서 또 남기면 질문 1건에 로그가 2행 쌓여 통계가 2배로 부풀려진다(실측).
       } catch {
         const r = routeFreeText(text)
         push(r.message)
-        log(r.logKind, { input: text, refId: r.refId })
+        log(r.logKind, { input: text, refId: r.refId, offline: true })
       } finally {
         setPending(false)
         inputRef.current?.focus()
