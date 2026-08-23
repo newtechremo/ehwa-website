@@ -90,7 +90,7 @@ export async function POST(request: Request) {
 
         // 첨부파일 추가
         const attachments = post.attachments || []
-        if (post.attachment && !attachments.find((a: any) => a.name === post.attachment.name)) {
+        if (post.attachment && !attachments.find((a: { name?: string }) => a.name === post.attachment.name)) {
           attachments.push(post.attachment)
         }
 

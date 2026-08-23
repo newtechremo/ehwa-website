@@ -7,6 +7,7 @@
  * 실행: npm run kb:ingest            (.env.local 기준 = 로컬 Supabase)
  *       npm run kb:ingest -- --prod  (운영 Supabase, .env.tokens 필요)
  */
+import "./load-env.mts"
 import { readFileSync, readdirSync } from "fs"
 import path from "path"
 import { createClient } from "@supabase/supabase-js"

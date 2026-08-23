@@ -19,7 +19,7 @@ const seqOf = (k: string) => Number(String(k).match(/^(\d+)_/)?.[1] ?? -1)
 async function ask(q: string) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     // 기본 fetch 타임아웃(약 30초)으로는 KB 전문 호출이 간혹 초과된다
-    let d: any = {}
+    let d: Record<string, unknown> & { source?: string; docIds?: string[]; refId?: string; reason?: string; answer?: string } = {}
     try {
       const r = await fetch(`${BASE}/api/chatbot/ask`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -41,7 +41,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 const results: Res[] = []
 
-async function run(items: any[], kind: "kb" | "policy" | "refuse") {
+type Item = { q: string; expect: number[] }
+
+async function run(items: Item[], kind: "kb" | "policy" | "refuse") {
   for (const it of items) {
     const d = await ask(it.q)
     const docs = (d.docIds ?? []).map(seqOf).filter((n: number) => n > 0)

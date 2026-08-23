@@ -3,6 +3,7 @@
  * 각 문서의 예상 질문(총 187개)을 넣어 자기 문서를 되찾는지 측정한다.
  * 실행: npm run kb:eval
  */
+import "./load-env.mts"
 import { loadKb, rankKb, KB_DIRECT_THRESHOLD } from "../lib/chatbot/kb"
 
 const docs = await loadKb()

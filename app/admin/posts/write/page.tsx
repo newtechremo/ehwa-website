@@ -495,7 +495,7 @@ export default function PostWritePage() {
 
               <div className="space-y-2">
                 <Label htmlFor="category">카테고리</Label>
-                <Select value={category} onValueChange={(value: any) => setCategory(value)}>
+                <Select value={category} onValueChange={(value) => setCategory(value as typeof category)}>
                   <SelectTrigger id="category">
                     <SelectValue />
                   </SelectTrigger>

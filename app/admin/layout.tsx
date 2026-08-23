@@ -22,7 +22,7 @@ export default function AdminLayout({
   const pathname = usePathname()
   const router = useRouter()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const [sessionChecked, setSessionChecked] = useState(false)
 
   // 로그인 페이지는 레이아웃 적용 안함
   const isLoginPage = pathname === "/admin/login"
@@ -46,11 +46,11 @@ export default function AdminLayout({
     }
   }, [])
 
+  // 로그인 페이지는 세션 확인이 필요 없다. effect 에서 상태를 덮어쓰는 대신 파생값으로 둔다.
+  const isLoading = !isLoginPage && !sessionChecked
+
   useEffect(() => {
-    if (isLoginPage) {
-      setIsLoading(false)
-      return
-    }
+    if (isLoginPage) return
 
     // 서버에 세션 유효성을 확인한다 (localStorage 플래그는 신뢰하지 않는다)
     let cancelled = false
@@ -64,7 +64,7 @@ export default function AdminLayout({
       } catch {
         if (!cancelled) router.push("/admin/login")
       } finally {
-        if (!cancelled) setIsLoading(false)
+        if (!cancelled) setSessionChecked(true)
       }
     })()
     return () => {

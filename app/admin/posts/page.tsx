@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -67,7 +67,6 @@ const initialPosts: Post[] = [
 
 export default function PostsListPage() {
   const [posts, setPosts] = useState<Post[]>([])
-  const [filteredPosts, setFilteredPosts] = useState<Post[]>([])
   const [categoryFilter, setCategoryFilter] = useState("전체")
   const [statusFilter, setStatusFilter] = useState("전체")
   const [searchQuery, setSearchQuery] = useState("")
@@ -81,7 +80,6 @@ export default function PostsListPage() {
         if (response.ok) {
           const data = await response.json()
           setPosts(data)
-          setFilteredPosts(data)
         }
       } catch (error) {
         console.error("Failed to load posts:", error)
@@ -90,26 +88,27 @@ export default function PostsListPage() {
     loadPosts()
   }, [])
 
-  useEffect(() => {
+  // 파생 상태는 effect 로 복사하지 않고 렌더 중 계산한다 (react-hooks/set-state-in-effect)
+  const filteredPosts = useMemo(() => {
     let filtered = posts
-
     if (categoryFilter !== "전체") {
       filtered = filtered.filter((post) => post.category === categoryFilter)
     }
-
     if (statusFilter === "노출") {
       filtered = filtered.filter((post) => post.status === true)
     } else if (statusFilter === "비활성") {
       filtered = filtered.filter((post) => post.status === false)
     }
-
     if (searchQuery) {
       filtered = filtered.filter((post) => post.title.toLowerCase().includes(searchQuery.toLowerCase()))
     }
-
-    setFilteredPosts(filtered)
-    setCurrentPage(1) // 필터 변경 시 첫 페이지로 이동
+    return filtered
   }, [categoryFilter, statusFilter, searchQuery, posts])
+
+  // 필터가 바뀌면 첫 페이지로. 이벤트 핸들러에서 직접 처리한다.
+  const changeCategory = (v: string) => { setCategoryFilter(v); setCurrentPage(1) }
+  const changeStatus = (v: string) => { setStatusFilter(v); setCurrentPage(1) }
+  const changeSearch = (v: string) => { setSearchQuery(v); setCurrentPage(1) }
 
   // 페이지네이션 계산
   const totalPages = Math.ceil(filteredPosts.length / ITEMS_PER_PAGE)
@@ -167,7 +166,7 @@ export default function PostsListPage() {
 
         {/* Filters */}
         <div className="flex gap-4 mb-6 mt-6">
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <Select value={categoryFilter} onValueChange={changeCategory}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="카테고리" />
             </SelectTrigger>
@@ -179,7 +178,7 @@ export default function PostsListPage() {
             </SelectContent>
           </Select>
 
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={changeStatus}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="상태" />
             </SelectTrigger>
@@ -196,7 +195,7 @@ export default function PostsListPage() {
               placeholder="제목 검색"
               className="pl-9"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => changeSearch(e.target.value)}
             />
           </div>
         </div>

@@ -72,16 +72,18 @@ export function ChatWidget() {
   // 관리자 화면에서는 노출하지 않는다 (채널톡 hideChannelButton과 동일 동작)
   const hidden = pathname?.startsWith("/admin") ?? false
 
-  // 최초 오픈 시 웰컴 노드 주입
-  useEffect(() => {
-    if (open && messages.length === 0) {
+  // 최초 오픈 시 웰컴 노드 주입.
+  // effect 안에서 setState 하면 열림 → 렌더 → 웰컴 주입 → 재렌더로 두 번 그린다.
+  // 열기 이벤트에서 바로 넣으면 한 번에 그려지고 스크린리더도 한 번만 읽는다.
+  const openPanel = useCallback(() => {
+    setMessages((prev) => {
+      if (prev.length > 0) return prev
       const r = routeNode(ROOT_NODE_ID)
-      if (r) {
-        setMessages([r.message])
-        setNodeHistory([ROOT_NODE_ID])
-      }
-    }
-  }, [open, messages.length])
+      return r ? [r.message] : prev
+    })
+    setNodeHistory((prev) => (prev.length > 0 ? prev : [ROOT_NODE_ID]))
+    setOpen(true)
+  }, [])
 
   useEffect(() => {
     if (open) endRef.current?.scrollIntoView({ block: "end" })
@@ -218,7 +220,7 @@ export function ChatWidget() {
       <button
         ref={launcherRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => (open ? setOpen(false) : openPanel())}
         aria-expanded={open}
         aria-controls="ehwa-chat-panel"
         aria-label={open ? "상담 챗봇 닫기" : `${BOT_NAME}에게 문의하기`}
