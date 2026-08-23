@@ -113,7 +113,7 @@ Free 플랜 2프로젝트 한도 때문에 env 컬럼으로 분리하기로 한 
 | 1 FAQ 오분류·채점기 | 완료 | `692b99d` | 매트릭스 39/39, 골든셋 43/43·126/126 유지. 엄격 채점 77/77(1회). 출처 누락 재시도 추가 |
 | 2 안전장치 | 완료 | `9e208ae` | 계획안 SQL 버그(2행 반환) 수정. `/log` 30회/분, cron SECRET 필수, 15초 타임아웃 |
 | 3 기준선·ESLint | 완료 | `33666d5` | lint 0 errors, tsc/build/test 모두 exit 0. kb:eval Top-1 97% |
-| 4 Preview | **대기** | — | 아래 결정 필요 |
+| 4 Preview | **완료(AI 경로 제외)** | `4a43915` | 아래 6절 |
 
 ### 추가로 발견된 사실
 
@@ -128,3 +128,20 @@ Free 플랜 2프로젝트 한도 때문에 env 컬럼으로 분리하기로 한 
 2. Vercel Preview 환경변수 등록 — Supabase 3종 복제 + `NEXT_PUBLIC_CHATBOT_ENABLED`·`CHATBOT_MODEL`·`CHATBOT_DAILY_AI_LIMIT`·`CHATBOT_LOG_RETAIN_DAYS`·`CRON_SECRET` + 임시 Gemini 키(또는 AI Gateway).
 3. `feat/chatbot` 원격 push → Preview 생성.
 4. 재시도 로직 반영 77문항 재검증 — KST 16:00 이후.
+
+## 6. Task 4 수행 결과 (2026-08-24 09:55 KST, 사용자 승인 후)
+
+- 운영 Supabase `20260823000000` 적용 — migration list 양쪽 일치. PostgREST 검증:
+  kb_documents 59 · chatbot_logs answer 컬럼 · `consume_chatbot_budget` true→false 1행 ·
+  `purge_chatbot_logs(3650)`=0 · anon RPC 거부(42501).
+- Vercel Preview 환경변수 9종 등록(Supabase 3종 plain/sensitive, 챗봇 4종, Gemini 키·CRON_SECRET sensitive).
+- Preview `4a43915` (`ehwa-website-pj30rh7lm`): 보호 302 유지, bypass 로 검수.
+  채널톡 SDK 0회 로드 · 자체 위젯만 노출 · /admin 런처 미노출 · 웰컴+버튼 6종 렌더.
+  FAQ(faq-19/faq-04) · 정책(policy-medical/billing) · 범위밖 fallback+연결카드 정상.
+  purge-logs 무인증 401 / CRON_SECRET 200. production 로그 오염 0행.
+- **발견·수정한 P0**: `void logChat()` fire-and-forget 이 서버리스에서 유실됨
+  (질문 5건 → 로그 4행 실측). Next `after()` 로 교체 후 질문 6건 → 로그 6행 확인. `4a43915`.
+- **미완(차단)**: AI 경로 검증 · 77문항 재검증. Gemini 키가 아직 무료 등급
+  (`…FreeTier` 한도 500회/일 소진, KST 16:00 리셋). 사용자가 유료 사용을 승인했으므로
+  Google AI Studio 에서 해당 키 프로젝트에 결제 계정 연결(Tier 1 승격) 필요 —
+  코드는 변경 불요, 같은 키로 한도만 올라간다. 승격 전까지는 16:00 리셋 후 재검증.
