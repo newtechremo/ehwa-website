@@ -103,3 +103,28 @@ Free 플랜 2프로젝트 한도 때문에 env 컬럼으로 분리하기로 한 
 1. **Task 0 승인** — `hotfix/admin-auth`를 main에 올릴지. 운영은 지금 무인증이다.
 2. 채널톡 **대화 이력 수령** (데스크 다운로드 또는 API 키).
 3. 채널톡 **동작 영상** 재수령 (Slack `#3-신기술개발팀` 2026-08-14 스레드).
+
+## 5. 진행 현황 (2026-08-24 01:30 KST)
+
+| 순서 | 상태 | 커밋 | 비고 |
+|---|---|---|---|
+| 0 운영 인증 배포 | **보류(사용자 결정)** | `hotfix/admin-auth` = `2939d13` (origin 푸시됨) | Preview `ehwa-website-l4hnu3lmg` 에서 무인증 쓰기 4종 401·위조쿠키 401·보호 302 확인. `GET /api/posts` 500 은 Preview 에 Supabase 변수가 없어서(Task 4 범위) |
+| 0' 문서 커밋 | 완료 | `167c693` | 계획 문서의 "로컬 kb_documents=0" 정정 |
+| 1 FAQ 오분류·채점기 | 완료 | `692b99d` | 매트릭스 39/39, 골든셋 43/43·126/126 유지. 엄격 채점 77/77(1회). 출처 누락 재시도 추가 |
+| 2 안전장치 | 완료 | `9e208ae` | 계획안 SQL 버그(2행 반환) 수정. `/log` 30회/분, cron SECRET 필수, 15초 타임아웃 |
+| 3 기준선·ESLint | 완료 | `33666d5` | lint 0 errors, tsc/build/test 모두 exit 0. kb:eval Top-1 97% |
+| 4 Preview | **대기** | — | 아래 결정 필요 |
+
+### 추가로 발견된 사실
+
+- **Gemini 무료 키는 모델당 500회/일** (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`). 2026-08-23 QA 반복으로 소진됐고 KST 16:00 리셋. 앱의 일일 한도(500)와 같은 값이라 **운영 전환 전에 유료 키 또는 AI Gateway 가 필요**하다. QA 1회가 60~77회를 쓰므로 무료 키로는 하루 6회가 상한이다.
+- `temperature: 0` 으로도 Gemini 는 결정적이지 않다(2회 실행 인용 조합 26/77 상이). 채점기는 "정답 문서 중 하나 인용"으로 흡수한다.
+- 계획안 Task 2 의 `consume_chatbot_budget` SQL 은 `return query` 뒤 `return` 누락으로 한도 초과 시 2행을 반환했다. 수정 후 검증.
+- Codex 의 "로컬 kb_documents=0" 오판 원인: `kb:eval` 이 `.env.local` 을 읽지 않았다. 로더 추가로 해결.
+
+### Task 4 착수 전 결정 사항
+
+1. 운영 Supabase 에 `20260823000000` 마이그레이션 적용(`supabase db push --linked`) — 가산(컬럼·함수 추가)이지만 운영 DB 변경이다.
+2. Vercel Preview 환경변수 등록 — Supabase 3종 복제 + `NEXT_PUBLIC_CHATBOT_ENABLED`·`CHATBOT_MODEL`·`CHATBOT_DAILY_AI_LIMIT`·`CHATBOT_LOG_RETAIN_DAYS`·`CRON_SECRET` + 임시 Gemini 키(또는 AI Gateway).
+3. `feat/chatbot` 원격 push → Preview 생성.
+4. 재시도 로직 반영 77문항 재검증 — KST 16:00 이후.
