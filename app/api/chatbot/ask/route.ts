@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { NextResponse, after } from "next/server"
 import { generateText } from "ai"
 import {
   FALLBACK_ACTION_IDS,
@@ -73,16 +73,20 @@ export async function POST(request: Request) {
    * fallback 응답 생성 + 로깅을 한 곳에 묶는다.
    * 이전에는 분기마다 logChat 을 따로 불러서 일부 경로(daily_limit, empty_after_strip)가
    * 로그 없이 빠져나갔다. 응답과 로그를 분리하면 반드시 다시 어긋난다.
+   *
+   * 로깅은 after() 로 감싼다. `void logChat(...)` fire-and-forget 은 서버리스에서
+   * 응답 반환 직후 함수가 정지되면 인서트가 유실된다(실측: Preview 질문 5건 중
+   * 로그 4행). after() 는 응답 완료 후에도 콜백 완료를 플랫폼이 보장한다.
    */
   const fallback = (reason: string, detail?: string) => {
-    void logChat({
+    after(() => logChat({
       sessionId,
       kind: "fallback",
       userInput: question,
       answer: FALLBACK_ANSWER,
       fallbackReason: reason,
       latencyMs: Date.now() - startedAt,
-    })
+    }))
     return NextResponse.json({
       source: "fallback",
       reason,
@@ -97,14 +101,14 @@ export async function POST(request: Request) {
   // ①② 정책 차단 / FAQ — 기존 엔진과 동일한 판단을 재사용한다
   const routed = routeFreeText(question)
   if (routed.logKind !== "fallback") {
-    void logChat({
+    after(() => logChat({
       sessionId,
       kind: routed.logKind,
       userInput: question,
       answer: routed.message.text,
       refId: routed.refId,
       latencyMs: Date.now() - startedAt,
-    })
+    }))
     return NextResponse.json({
       source: routed.message.source,
       answer: routed.message.text,
@@ -120,13 +124,13 @@ export async function POST(request: Request) {
   const best = hits[0]
 
   if (best && best.score >= KB_DIRECT_THRESHOLD) {
-    void logChat({
+    after(() => logChat({
       sessionId, kind: "ai_answer", userInput: question,
       answer: best.doc.answer,
       refId: best.doc.doc_key, sourceDocIds: [best.doc.doc_key],
       provider: "kb-direct",
       latencyMs: Date.now() - startedAt,
-    })
+    }))
     return NextResponse.json({
       source: "kb",
       answer: best.doc.answer,
@@ -269,14 +273,14 @@ export async function POST(request: Request) {
     .trim()
   if (!answer) return fallback("empty_after_strip")
 
-  void logChat({
+  after(() => logChat({
     sessionId, kind: "ai_answer", userInput: question,
     answer,
     refId: cited[0], sourceDocIds: cited,
     provider: choice.provider, model: retried ? `${choice.id}+retry` : choice.id,
     latencyMs: Date.now() - startedAt,
     ...usage,
-  })
+  }))
   return NextResponse.json({
     source: "ai",
     answer,
