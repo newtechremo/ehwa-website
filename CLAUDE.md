@@ -4,7 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-이대목동병원 장애인 이용편의 지원센터 (Ewha Womans University Mokdong Hospital Accessibility Support Center) - A Next.js website with public-facing landing page and admin CMS for managing news/blog posts.
+이대목동병원 장애인 이용편의 지원센터의 Next.js 웹사이트다. 공개 랜딩/소식 CMS와 함께,
+채널톡의 버튼·FAQ·KB·AI 안내를 사이트 DOM 내부 자체 챗봇으로 교체하는 작업이 `feat/chatbot`에서 진행 중이다.
 
 ## Build & Development Commands
 
@@ -12,7 +13,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev      # Start dev server (port 3112, hostname 0.0.0.0)
 npm run build    # Production build
 npm run start    # Production server (port 3112)
-npm run lint     # ESLint
+npm run lint     # ESLint (현재 의존성/Flat Config 미설정, 최신 실행 계획 Task 3에서 복구)
+npx tsc --noEmit # Next build가 건너뛰는 TypeScript 독립 검사
+npm run test:chatbot # 정책·FAQ 라우팅 회귀
+npm run kb:eval      # 로컬 Supabase KB 검색 평가
+npm run qa           # dev 서버 대상 77문항 API QA
+npm run db:start     # 로컬 Supabase 시작
+npm run db:reset     # 로컬 DB 마이그레이션 재적용
 ```
 
 ## Architecture
@@ -28,8 +35,9 @@ npm run lint     # ESLint
 ```
 app/
 ├── page.tsx              # Main landing page (client-side SPA)
-├── layout.tsx            # Root layout (fonts, Botpress chatbot, analytics)
-└── admin/                # Protected CMS area
+├── layout.tsx            # Root layout, ChannelTalk/self-hosted chatbot switch, analytics
+├── api/chatbot/          # ask/log APIs
+└── admin/                # Server-session-protected CMS area
     ├── login/            # Authentication
     ├── posts/            # CRUD for news posts
     │   ├── write/        # Create post
@@ -44,12 +52,23 @@ app/
 - `lib/` - Utilities (api.ts for fetch wrapper, posts.ts for data management)
 
 ### Data Persistence
-All data uses **localStorage** (no backend):
-- Posts: `localStorage.getItem("news_posts")`
-- Featured slots: `localStorage.getItem("featured_slots")`
-- Auth: `localStorage.getItem("isAuthenticated")`
 
-Post categories: `"공지"` (Notice), `"행사"` (Event), `"뉴스"` (News)
+- Supabase Postgres: posts, attachments, featured slots, chatbot logs/usage, KB 59 documents
+- Supabase Storage: `ehwa-attachments`
+- Admin auth: server-side scrypt verification + HMAC-signed httpOnly cookie
+- Local development: Docker-based local Supabase; Preview/Production use the hosted project
+- Post categories: `"공지"` (Notice), `"행사"` (Event), `"뉴스"` (News)
+
+### ChannelTalk Replacement
+
+- Authoritative design: `docs/챗봇_자체구축_통합구현플랜_20260820.md`
+- Latest status/release plan: `docs/superpowers/plans/2026-08-23-channeltalk-replacement-release.md`
+- Flow: policy/review block → FAQ → KB direct → grounded LLM → phone/Kakao fallback
+- `NEXT_PUBLIC_CHATBOT_ENABLED=true`: render `components/chat/ChatWidget.tsx`; otherwise load ChannelTalk
+- Production remains on ChannelTalk until QA, privacy, migration, accessibility, and history-export gates pass
+- Do not treat `tests/qa-result.json`'s old 76/77 as release approval; its FAQ scoring must be fixed first
+- Phase A's browser check is historical; latest Preview still needs Chrome/Edge/Firefox/Safari, iOS/Android, NVDA/VoiceOver/TalkBack, failure-state, and hospital copy/UI approval
+- Record the exact Preview URL, Git commit, browser/device results, evidence links, P0/P1 count, and approvers in `tests/chatbot-browser-qa.md` when executing release-plan Task 5
 
 ## Key Patterns
 
@@ -71,8 +90,8 @@ import { apiGet, apiPost } from "@/lib/api"
 
 ## Configuration Notes
 
-- `next.config.mjs`: CORS enabled for all routes, TypeScript errors ignored in build
-- External services: Botpress chatbot, Vercel Analytics, Kakao Chat
+- `next.config.mjs`: cross-origin GET/HEAD/OPTIONS only; TypeScript errors are currently ignored in Next build
+- External services: ChannelTalk fallback, Vercel Analytics/AI Gateway, Google Generative AI, Kakao Chat, Walla
 - robots meta: `noindex, nofollow` (not indexed by search engines)
 
 ## Korean Language Context
