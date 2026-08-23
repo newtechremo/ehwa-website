@@ -76,10 +76,37 @@ export function containsPII(raw: string): boolean {
 const FAQ_THRESHOLD = 0.34
 const FAQ_KEYWORD_BONUS = 0.18
 
+/**
+ * FAQ 유사도 비교에서만 제거하는 의문형 공통 표현.
+ *
+ * 실측: "제가 늦으면 어떻게 되나요?" 가 "연락 없이 안 가면 어떻게 되나요?"(노쇼 FAQ)에
+ * 0.38로 매칭됐다. 내용어는 하나도 겹치지 않고 "어떻게 되나요" 어미만으로 임계값을
+ * 넘긴 것이다. 의문사·종결 표현은 거의 모든 질문에 들어가므로 유사도에 기여하면 안 된다.
+ *
+ * 44개 한국어 FAQ용 휴리스틱이다. 부분 포함 판정과 키워드 보너스에는 적용하지 않으며
+ * 클라이언트 번들이므로 서버용 kb.ts 의 토크나이저를 가져오지 않는다.
+ * 실제 질문 QA에서 한계가 보이면 형태소 분석을 검토한다.
+ */
+const FAQ_NOISE =
+  /(어떻게|어디서|어디|무엇|뭐|알려주세요|알려줘|도와주세요|도와줘|되나요|되나|하나요|하나|할까요|인가요|가요|나요|까요)/g
+
+function faqKey(input: string): string {
+  return normalize(input).replace(FAQ_NOISE, "")
+}
+
+/**
+ * 잡음을 뺀 내용어가 이보다 짧은 FAQ 변형은 유사도 비교에 쓰지 않는다.
+ * 실측: "예약은 어디서 해?" → 내용어 "예약은해"(4자). 이 네 글자를 품은 입력은 무엇이든
+ * 0.5점을 받아 "진료 예약은 어떻게 해요?"(병원 예약, KB 46)가 편의지원 신청 FAQ 로 갔다.
+ * 짧은 변형은 입력이 그 문장을 그대로 담고 있을 때(부분 포함 0.9)만 잡는다.
+ */
+const FAQ_MIN_KEY = 6
+
 export function matchFaq(input: string): { faq: ChatFaq; score: number } | null {
   const raw = input.trim()
   const norm = normalize(raw)
   if (!norm) return null
+  const key = faqKey(raw)
 
   let best: { faq: ChatFaq; score: number } | null = null
 
@@ -93,7 +120,9 @@ export function matchFaq(input: string): { faq: ChatFaq; score: number } | null 
       if (norm.length >= 4 && (norm.includes(nq) || nq.includes(norm))) {
         score = Math.max(score, 0.9)
       }
-      score = Math.max(score, similarity(norm, nq))
+      // 유사도는 의문형 잡음을 뺀 내용어끼리 비교한다
+      const fk = faqKey(q)
+      if (fk.length >= FAQ_MIN_KEY) score = Math.max(score, similarity(key, fk))
     }
 
     const hits = (faq.keywords ?? []).filter((k) => {

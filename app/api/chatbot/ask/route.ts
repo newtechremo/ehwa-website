@@ -194,23 +194,50 @@ export async function POST(request: Request) {
     tokensOut?: number | null
     tokensCached?: number | null
   } = {}
-  try {
+  let retried = false
+
+  const generate = async (nudge?: string) => {
     const res = await generateText({
       model: choice.model,
-      system,
+      system: nudge ? `${system}\n\n${nudge}` : system,
       messages: [
         ...history.map((t) => ({ role: t.role, content: t.text }) as const),
         { role: "user" as const, content: question },
       ],
       maxOutputTokens: MAX_OUTPUT_TOKENS,
-      temperature: 0.2,
+      // 안내 챗봇은 창의성이 필요 없다. 다만 0 으로 둬도 Gemini 는 완전히 결정적이지
+      // 않다(실측: 같은 77문항 2회 실행에서 인용 문서 조합이 26건 달랐다). 편차를 줄이는
+      // 효과만 기대하고, 재현성은 채점기가 "정답 문서 중 하나 인용"으로 흡수한다.
+      temperature: 0,
     })
     text = (res.text ?? "").trim()
     usage = {
-      tokensIn: res.usage?.inputTokens ?? null,
-      tokensOut: res.usage?.outputTokens ?? null,
+      tokensIn: (usage.tokensIn ?? 0) + (res.usage?.inputTokens ?? 0),
+      tokensOut: (usage.tokensOut ?? 0) + (res.usage?.outputTokens ?? 0),
       // 암시적 컨텍스트 캐시 적중분. 이 값이 떨어지면 비용이 조용히 4배가 된다.
-      tokensCached: res.usage?.inputTokenDetails?.cacheReadTokens ?? null,
+      tokensCached: (usage.tokensCached ?? 0) + (res.usage?.inputTokenDetails?.cacheReadTokens ?? 0),
+    }
+  }
+
+  const extractSeqs = (t: string) => {
+    const seqs = new Set<number>()
+    for (const m of t.matchAll(/\[?\s*출처\s*[::]\s*([0-9,\s]+)\]?/g)) {
+      for (const n of m[1].split(",")) {
+        const v = Number(n.trim())
+        if (Number.isInteger(v)) seqs.add(v)
+      }
+    }
+    return seqs
+  }
+
+  try {
+    await generate()
+    // 모델이 답은 제대로 쓰고 출처 표기만 빼먹는 경우가 있다(실측: 77문항 중 1건꼴).
+    // 그대로 두면 맞는 답이 통째로 담당자 연결로 떨어진다. 한 번만 더 요구한다.
+    // 재시도는 실패 요청에만 발생하므로 평균 비용 영향은 1~2% 수준이다.
+    if (text && !text.includes("UNANSWERABLE") && extractSeqs(text).size === 0) {
+      retried = true
+      await generate("중요: 직전 답변에 근거 문서 번호가 없었습니다. 반드시 마지막 줄에 `[출처: 번호]` 를 적으세요.")
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -228,13 +255,7 @@ export async function POST(request: Request) {
   const REFUSAL = /(정보(가|는)?\s*(없|가지고 있지 않))|((답변|안내)(을|를)?\s*(드릴|해 드릴)?\s*수\s*없)|(확인(이|해)?\s*어렵)/
   if (REFUSAL.test(text)) return fallback("model_refused")
 
-  const seqs = new Set<number>()
-  for (const m of text.matchAll(/\[?\s*출처\s*[::]\s*([0-9,\s]+)\]?/g)) {
-    for (const n of m[1].split(",")) {
-      const v = Number(n.trim())
-      if (Number.isInteger(v)) seqs.add(v)
-    }
-  }
+  const seqs = extractSeqs(text)
   const cited = docs.filter((d) => seqs.has(d.seq)).map((d) => d.doc_key)
   if (cited.length === 0) return fallback("no_citation")
 
@@ -252,7 +273,7 @@ export async function POST(request: Request) {
     sessionId, kind: "ai_answer", userInput: question,
     answer,
     refId: cited[0], sourceDocIds: cited,
-    provider: choice.provider, model: choice.id,
+    provider: choice.provider, model: retried ? `${choice.id}+retry` : choice.id,
     latencyMs: Date.now() - startedAt,
     ...usage,
   })

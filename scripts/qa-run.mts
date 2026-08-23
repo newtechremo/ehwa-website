@@ -9,7 +9,10 @@ import { readFileSync, writeFileSync } from "fs"
 const BASE = process.env.QA_BASE ?? "http://localhost:3112"
 const set = JSON.parse(readFileSync("tests/qa-set.json", "utf8"))
 
-type Res = { q: string; expect: unknown; source: string; docs: number[]; reason: string; answer: string; pass: boolean }
+type Res = { q: string; expect: unknown; source: string; refId: string; docs: number[]; reason: string; answer: string; pass: boolean }
+
+/** FAQ 업로드본의 faq-NN 번호는 KB 문서 번호와 1:1 로 대응한다 (faq-35 = KB 35 노쇼) */
+const faqSeq = (refId: unknown) => Number(String(refId ?? "").match(/^faq-(\d+)$/)?.[1] ?? -1)
 
 const seqOf = (k: string) => Number(String(k).match(/^(\d+)_/)?.[1] ?? -1)
 
@@ -42,22 +45,22 @@ async function run(items: any[], kind: "kb" | "policy" | "refuse") {
   for (const it of items) {
     const d = await ask(it.q)
     const docs = (d.docIds ?? []).map(seqOf).filter((n: number) => n > 0)
-    // KB 문항 판정:
-    //   answered  = 정답 문서를 인용했거나, 검수된 FAQ가 답했다
-    //   FAQ는 원본 44건의 고정 답변이라 내용이 KB와 동일한 주제를 다룬다.
-    //   다만 FAQ가 엉뚱한 주제를 가로챌 수 있으므로 별도 집계해 눈으로 확인한다.
+    // KB 문항 판정: 정답 문서를 인용했거나, 정답 문서에 대응하는 원본 FAQ(faq-NN)가 답했다.
+    // 이전에는 source=faq 면 무조건 통과시켰고, 그 틈으로 "늦으면"→노쇼 FAQ,
+    // "진단서"→센터위치 FAQ 같은 오답이 11건 중에 숨어 있었다(2026-08-23 발견).
     let pass = false
     let note = ""
     if (kind === "kb") {
       const cited = docs.some((n: number) => it.expect.includes(n))
-      if (cited) pass = true
-      else if (d.source === "faq") { pass = true; note = "FAQ 응답 — 내용 확인 필요" }
-      else if (d.source === "ai") { pass = false; note = `다른 문서 인용(${docs.join(",")})` }
+      const matchedFaq = d.source === "faq" && it.expect.includes(faqSeq(d.refId))
+      if (cited || matchedFaq) pass = true
+      else if (d.source === "faq") note = `다른 FAQ 응답(${d.refId})`
+      else if (d.source === "ai") note = `다른 문서 인용(${docs.join(",")})`
       else note = d.reason ?? d.source
     } else if (kind === "policy") pass = d.source === "policy"
     else pass = d.source === "fallback"
-    results.push({ q: it.q, expect: it.expect, source: d.source ?? "?", docs, reason: note || (d.reason ?? ""), answer: (d.answer ?? "").replace(/\n/g, " ").slice(0, 100), pass })
-    await sleep(1800)
+    results.push({ q: it.q, expect: it.expect, source: d.source ?? "?", refId: String(d.refId ?? ""), docs, reason: note || (d.reason ?? ""), answer: (d.answer ?? "").replace(/\n/g, " ").slice(0, 100), pass })
+    await sleep(3000) // 무료 키 RPM 한도 회피: 출처 재시도로 호출이 2회가 될 수 있다
   }
 }
 
@@ -71,10 +74,10 @@ const po = results.slice(set.kb.length, set.kb.length + set.policy.length)
 const oo = results.slice(set.kb.length + set.policy.length)
 
 console.log("\n══════ 채점 결과 ══════")
-const kbCited = kb.filter((r) => r.pass && !r.reason.startsWith("FAQ"))
-const kbFaq = kb.filter((r) => r.pass && r.reason.startsWith("FAQ"))
+const kbCited = kb.filter((r) => r.pass && r.source !== "faq")
+const kbFaq = kb.filter((r) => r.pass && r.source === "faq")
 console.log(`  KB 정답 문서 인용   ${g(kbCited.length, kb.length)}`)
-console.log(`  FAQ가 응답(확인要)  ${g(kbFaq.length, kb.length)}`)
+console.log(`  정답 FAQ 응답       ${g(kbFaq.length, kb.length)}`)
 console.log(`  KB 합계             ${g(kb.filter((r) => r.pass).length, kb.length)}`)
 console.log(`  정책 차단           ${g(po.filter((r) => r.pass).length, po.length)}`)
 console.log(`  범위 밖 거절        ${g(oo.filter((r) => r.pass).length, oo.length)}`)
@@ -83,7 +86,7 @@ console.log(`  전체                ${g(results.filter((r) => r.pass).length, r
 const fails = results.filter((r) => !r.pass)
 if (fails.length) {
   console.log("\n── 불합격 ──")
-  for (const f of fails) console.log(`  ✗ "${f.q}"\n      기대=${JSON.stringify(f.expect)} 실제=${f.source}/${f.docs.join(",")||f.reason}\n      "${f.answer.slice(0, 70)}"`)
+  for (const f of fails) console.log(`  ✗ "${f.q}"\n      기대=${JSON.stringify(f.expect)} 실제=${f.source}/${f.refId || f.docs.join(",") || f.reason}\n      "${f.answer.slice(0, 70)}"`)
 }
 writeFileSync("tests/qa-result.json", JSON.stringify(results, null, 2), "utf8")
 console.log("\n  상세: tests/qa-result.json")
