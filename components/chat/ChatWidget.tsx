@@ -33,6 +33,8 @@ function getSessionId(): string {
   }
 }
 
+const CHAT_REQUEST_TIMEOUT_MS = 15_000
+
 /** 로그는 실패해도 대화를 막지 않는다 (fire-and-forget) */
 function log(kind: LogKind, opts: { input?: string; refId?: string; offline?: boolean }) {
   try {
@@ -175,8 +177,17 @@ export function ChatWidget() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question: text, sessionId: getSessionId(), history }),
+          // 서버 maxDuration 30초보다 짧게 끊는다. 그 이상 기다리게 두면 이용자는
+          // 멈춘 것으로 보고 창을 닫는다. 초과·단절·비정상 JSON 은 아래 catch 의
+          // 로컬 엔진(정책·FAQ·담당자 연결)으로 강등해 무한 대기를 만들지 않는다.
+          signal: AbortSignal.timeout(CHAT_REQUEST_TIMEOUT_MS),
         })
         const data = await res.json()
+        // 429 는 유효한 answer(잠시 후 재시도 안내)를 주므로 그대로 보여준다.
+        // 400/500 의 오류 JSON 이나 answer 가 없는 응답은 로컬 fallback 으로 보낸다.
+        if (typeof data?.answer !== "string" || !data.answer.trim()) {
+          throw new Error(`invalid chatbot response: ${res.status}`)
+        }
         push({
           id: `b-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           role: "bot",

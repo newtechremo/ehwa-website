@@ -18,12 +18,14 @@ const DEFAULT_RETAIN_DAYS = 90
 
 export async function GET(request: Request) {
   // Vercel Cron은 CRON_SECRET이 설정돼 있으면 Authorization 헤더를 자동으로 붙인다.
+  // 시크릿이 없는 배포에서는 실행 자체를 거부한다. "없으면 누구나 호출 가능"이던
+  // 이전 동작은 설정 누락 한 번으로 공개 엔드포인트가 되는 구조였다.
   const secret = process.env.CRON_SECRET
-  if (secret) {
-    const auth = request.headers.get("authorization")
-    if (auth !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+  if (!secret) {
+    return NextResponse.json({ error: "CRON_SECRET 미설정" }, { status: 503 })
+  }
+  if (request.headers.get("authorization") !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL

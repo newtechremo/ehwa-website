@@ -14,7 +14,16 @@ const MAX_PER_WINDOW = 8
 type Bucket = { count: number; resetAt: number }
 const buckets = new Map<string, Bucket>()
 
-export function checkRateLimit(key: string): { ok: boolean; retryAfterSec: number } {
+/**
+ * 세션·IP 단위 분당 호출 제한.
+ *
+ * ponytail: Vercel 인스턴스(Fluid Compute 워커)별 인메모리 제한이다. 인스턴스가
+ * 여러 개면 각자 따로 센다. 전역 IP 차단이 필요해지면 Vercel WAF 로 올린다.
+ * 일일 총량은 DB 가 원자적으로 보장하므로(consumeDailyBudget) 과금 상한은 이것과 무관하다.
+ *
+ * @param max 창당 허용 횟수. AI 호출(기본 8)보다 버튼 클릭 로그는 훨씬 잦으므로 호출부가 올린다.
+ */
+export function checkRateLimit(key: string, max = MAX_PER_WINDOW): { ok: boolean; retryAfterSec: number } {
   const now = Date.now()
   const b = buckets.get(key)
 
@@ -26,7 +35,7 @@ export function checkRateLimit(key: string): { ok: boolean; retryAfterSec: numbe
     return { ok: true, retryAfterSec: 0 }
   }
 
-  if (b.count >= MAX_PER_WINDOW) {
+  if (b.count >= max) {
     return { ok: false, retryAfterSec: Math.ceil((b.resetAt - now) / 1000) }
   }
   b.count += 1
@@ -49,30 +58,32 @@ export function dailyLimit(): number {
   return Number.isFinite(n) && n > 0 ? n : 500
 }
 
-/** 오늘 AI 호출 여유가 있는지 확인하고, 있으면 1 증가시킨다 */
+/**
+ * 오늘 AI 호출 여유가 있는지 확인하고, 있으면 1 증가시킨다.
+ *
+ * DB 함수 한 번으로 판정과 증가를 함께 처리한다(consume_chatbot_budget).
+ * 이전의 "읽고 → 비교 → upsert" 두 단계는 동시 요청이 같은 값을 읽어 한도를
+ * 넘길 수 있었다. 한도는 과금 방어선이라 경쟁 조건을 허용하면 안 된다.
+ * DB 오류 시에는 열어두지 않고 닫는다(AI 만 꺼지고 버튼·FAQ·KB 는 계속 동작).
+ */
 export async function consumeDailyBudget(): Promise<{ ok: boolean; used: number; limit: number }> {
   const limit = dailyLimit()
   const client = db()
   if (!client) return { ok: false, used: 0, limit }
 
-  const env = process.env.VERCEL_ENV ?? "development"
-  const day = today()
+  const { data, error } = await client
+    .rpc("consume_chatbot_budget", {
+      p_day: today(),
+      p_env: process.env.VERCEL_ENV ?? "development",
+      p_limit: limit,
+    })
+    .single<{ used: number; allowed: boolean }>()
 
-  const { data } = await client
-    .from("chatbot_usage")
-    .select("ai_calls")
-    .eq("day", day)
-    .eq("env", env)
-    .maybeSingle()
-
-  const used = data?.ai_calls ?? 0
-  if (used >= limit) return { ok: false, used, limit }
-
-  await client.from("chatbot_usage").upsert(
-    { day, env, ai_calls: used + 1 },
-    { onConflict: "day,env" },
-  )
-  return { ok: true, used: used + 1, limit }
+  if (error || !data) {
+    console.error("consumeDailyBudget rpc 실패:", error?.message)
+    return { ok: false, used: 0, limit }
+  }
+  return { ok: data.allowed, used: data.used, limit }
 }
 
 export function clientKey(request: Request, sessionId: string): string {
