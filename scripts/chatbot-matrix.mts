@@ -12,8 +12,12 @@ const CASES: Case[] = [
   // 정책 차단 (보험·병원비)
   { input: "실비 보험 청구 되나요?", expect: "policy_block" },
   { input: "진료비 얼마나 나오나요?", expect: "policy_block" },
-  { input: "비급여 항목인가요?", expect: "policy_block" },
-  { input: "진단서 발급 받고 싶어요", expect: "policy_block" },
+  // 비급여 "가격 조회"는 KB 문서 56이 안내한다. 정책 차단 대상이 아니다.
+  // (보험 처리·진료비 판단만 범위 밖)
+  { input: "비급여 항목인가요?", expect: "fallback" },
+  // 진단서 "발급 절차"는 KB 문서 54(신청발급 안내)가 답한다.
+  // 의학적 판단(진단 자체)만 정책 차단 대상이다.
+  { input: "진단서 발급 받고 싶어요", expect: "fallback" },
   // 정책 차단 (민원)
   { input: "직원이 불친절했어요", expect: "policy_block" },
   { input: "민원 넣고 싶습니다", expect: "policy_block" },
