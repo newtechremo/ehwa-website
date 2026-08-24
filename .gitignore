@@ -37,6 +37,7 @@ server.log
 # Temp files
 *.deb
 /tmp/
+.worktrees/
 
 # Debug
 .debug/
