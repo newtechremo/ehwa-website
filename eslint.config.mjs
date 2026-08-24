@@ -6,7 +6,7 @@ import nextTs from "eslint-config-next/typescript"
 export default defineConfig([
   ...nextVitals,
   ...nextTs,
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "docs/**", "supabase/**"]),
+  globalIgnores([".next/**", ".worktrees/**", "out/**", "build/**", "next-env.d.ts", "docs/**", "supabase/**"]),
   {
     // shadcn/ui 에서 그대로 가져온 코드. React Compiler 규칙(set-state-in-effect, purity)이
     // 상류 구현 패턴을 지적한다. 상류와 다르게 고치면 업데이트 때 다시 갈라지므로
