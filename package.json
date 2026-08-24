@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "next dev --port 3112 --hostname 0.0.0.0",
+    "dev": "CHATBOT_USAGE_NAMESPACE=development-human next dev --port 3112 --hostname 0.0.0.0",
     "dev:qa": "CHATBOT_USAGE_NAMESPACE=qa-local CHATBOT_DAILY_AI_LIMIT=1000 next dev --port 3113 --hostname 0.0.0.0",
     "lint": "eslint .",
     "start": "next start --port 3112 --hostname 0.0.0.0",
@@ -15,6 +15,7 @@
     "test:ct-export": "tsx scripts/ct-export-test.mts",
     "retrieval:test": "tsx scripts/retrieval-test.mts",
     "retrieval:eval": "tsx scripts/retrieval-eval.mts",
+    "chatbot:report": "tsx scripts/chatbot-report.mts",
     "qa:critical": "tsx scripts/qa-critical.mts",
     "db:start": "supabase start",
     "db:stop": "supabase stop",

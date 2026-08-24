@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Development Commands
 
 ```bash
-npm run dev      # Start dev server (port 3112, hostname 0.0.0.0)
+npm run dev      # 사람 로컬 서버 (port 3112, namespace development-human)
 npm run dev:qa   # QA 전용 namespace 서버 (port 3113)
 npm run build    # Production build
 npm run start    # Production server (port 3112)
@@ -104,7 +104,7 @@ import { apiGet, apiPost } from "@/lib/api"
 
 ## Configuration Notes
 
-- `next.config.mjs`: cross-origin GET/HEAD/OPTIONS only; TypeScript errors are currently ignored in Next build
+- `next.config.mjs`: cross-origin GET/HEAD/OPTIONS only; TypeScript 오류도 production build를 실패시킨다
 - External services: ChannelTalk fallback, Vercel Analytics/AI Gateway, Google Generative AI, Kakao Chat, Walla
 - robots meta: `noindex, nofollow` (not indexed by search engines)
 
