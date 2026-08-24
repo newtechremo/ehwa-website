@@ -59,6 +59,11 @@ const CASES: Case[] = [
   { input: "어떻게 이용할 수 있어요?", expect: "fallback", note: "당일이용 FAQ(faq-04) 가로채기 금지 — KB 3/6" },
   { input: "병원에 도착해서 뭘 해야해?", expect: "fallback", note: "KB직답 19(외부이동) 오답 금지 — KB 47 진료절차" },
   { input: "서비스 이용하면 주차비 무료인가요?", expect: "faq_hit", expectRef: "faq-36", note: "정확 질문은 그대로 FAQ" },
+  // 재시작 메타 의도 (채널톡 실대화 관측) → 웰컴 재안내
+  { input: "처음부터 말하고 싶어요", expect: "button", expectRef: "root" },
+  { input: "버튼질문 다시 알려줘", expect: "button", expectRef: "root" },
+  // 재신청 질문이 재시작으로 오분류되면 안 됨
+  { input: "서비스 다시 시작하고 싶어요", expect: "fallback", note: "KB 5 재신청" },
   // Fallback (KB에 없음 → 지어내면 안 됨)
   { input: "주차장에 전기차 충전기 있나요?", expect: "fallback" },
   { input: "구내식당 메뉴가 뭐예요?", expect: "fallback" },

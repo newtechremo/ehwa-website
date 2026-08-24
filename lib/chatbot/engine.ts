@@ -1,5 +1,6 @@
 import {
   FAQS,
+  ROOT_NODE_ID,
   FALLBACK_ACTION_IDS,
   FALLBACK_ANSWER,
   POLICIES,
@@ -163,9 +164,22 @@ function policyMessage(rule: ChatPolicy): ChatMessage {
  * 순서가 곧 안전 정책이다: 검토대기 → 정책차단 → FAQ → (Phase B: AI) → Fallback
  * 앞의 두 단계는 어떤 경우에도 FAQ/AI보다 우선한다.
  */
+/**
+ * 대화 재시작·버튼 재노출 요청 (채널톡 실대화에서 관측된 메타 의도).
+ * "처음부터 말하고 싶어요", "버튼질문 다시 알려줘" 가 담당자 연결로 떨어졌었다.
+ * 실제 채널톡은 재안내로 응대했다. 내용 질문이 아니므로 KB/LLM 이전에 처리한다.
+ */
+// "다시 시작"은 넣지 않는다 — "서비스 다시 시작하고 싶어요"(재신청, KB 5)를 삼킨다.
+const RESTART_INTENT = /(^처음부터|^처음으로|버튼.{0,6}(다시|보여|알려)|메뉴.{0,4}(다시|보여))/
+
 export function routeFreeText(input: string): EngineResult {
   const raw = input.trim()
   const norm = normalize(raw)
+
+  if (RESTART_INTENT.test(raw)) {
+    const root = routeNode(ROOT_NODE_ID)
+    if (root) return root
+  }
 
   for (const rule of REVIEW_TOPICS) {
     if (matchesKeywords(rule, raw, norm)) {
