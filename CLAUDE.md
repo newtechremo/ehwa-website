@@ -17,7 +17,7 @@ npm run lint     # ESLint (현재 의존성/Flat Config 미설정, 최신 실행
 npx tsc --noEmit # Next build가 건너뛰는 TypeScript 독립 검사
 npm run test:chatbot # 정책·FAQ 라우팅 회귀
 npm run kb:eval      # 로컬 Supabase KB 검색 평가
-npm run qa           # dev 서버 대상 77문항 API QA
+npm run qa           # dev 서버 대상 현재 qa-set 전체 API QA (문항 수 하드코딩 금지)
 npm run db:start     # 로컬 Supabase 시작
 npm run db:reset     # 로컬 DB 마이그레이션 재적용
 ```
@@ -62,11 +62,15 @@ app/
 ### ChannelTalk Replacement
 
 - Authoritative design: `docs/챗봇_자체구축_통합구현플랜_20260820.md`
+- **Authoritative current status/correction:** `docs/자체챗봇_현재현황_및_RAG_QA_근본원인분석_20260824.md`
+- Improvement order and 500-call attribution: `docs/자체챗봇_개선실행방안_및_AI한도_소진원인분석_20260824.md`
 - Latest status/release plan: `docs/superpowers/plans/2026-08-23-channeltalk-replacement-release.md`
 - Flow: policy/review block → FAQ → KB direct → grounded LLM → phone/Kakao fallback
 - `NEXT_PUBLIC_CHATBOT_ENABLED=true`: render `components/chat/ChatWidget.tsx`; otherwise load ChannelTalk
 - Production remains on ChannelTalk until QA, privacy, migration, accessibility, and history-export gates pass
 - Do not treat `tests/qa-result.json`'s old 76/77 as release approval; its FAQ scoring must be fixed first
+- Do not treat the later 80/80 result or closed-only ChannelTalk replay as release approval either. The current
+  `qa-set` has 82 cases while `qa-result` has 80 rows, and the old export omitted 13 `initial` chats.
 - Phase A's browser check is historical; latest Preview still needs Chrome/Edge/Firefox/Safari, iOS/Android, NVDA/VoiceOver/TalkBack, failure-state, and hospital copy/UI approval
 - Record the exact Preview URL, Git commit, browser/device results, evidence links, P0/P1 count, and approvers in `tests/chatbot-browser-qa.md` when executing release-plan Task 5
 
