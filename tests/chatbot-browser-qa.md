@@ -1,8 +1,8 @@
 # Chatbot Browser QA
 
-- Preview URL: https://ehwa-website-ql6xyd68n-remo-dev.vercel.app
+- Preview URL: https://ehwa-website-e7jk4qp7v-remo-dev.vercel.app
   (Deployment Protection 302 — bypass 필요)
-- Git commit: `0632859b81f539ef9da078a6ab4483201e457805` (동작 코드 `64be426`)
+- Git commit: `75dc0706f2f4a91a539011a9f3d301a9769e0d9e` (동작 코드 `64be426`)
 - 자동 검증일/KST: 2026-08-24
 - 수동 수행자: 미지정
 - 채널톡 비교 기준: 4개 상태 28건·620메시지·158 자유질문 전체 replay. 결과는
@@ -18,6 +18,7 @@
 | critical canary | 자동 13/13, 모델 시도·예산 증가 0 ✓ |
 | canary 누락 위치 후속 | 별도 실행 4/4, KB 직답·모델 시도 0 ✓ |
 | 기준 브랜치 build/lint | build PASS, lint 0 errors·기존 UI warning 24건 ✓ |
+| 이동 보조 신청 smoke | KB 03 직답, 필수 사실 전부 포함, 모델 시도 0 ✓ |
 | 채널톡 SDK 미로드 / 자체 위젯만 포함 | 현재 Preview HTML에서 SDK 0·위젯 1 ✓ |
 | 전체 ChannelTalk replay | 158/158 실행 ✓ |
 | replay 내용 coverage | fallback 11건 모두 범위 밖·근거 부족, 답변 가능 fallback 0건 ✓ |

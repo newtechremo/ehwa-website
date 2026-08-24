@@ -4,11 +4,14 @@
 
 - Production은 계속 ChannelTalk을 사용한다.
 - 개선 브랜치 `feat/chatbot-rag-reliability`는 2026-08-24 23:25 KST에 실제 기준 브랜치
-  `feat/chatbot`으로 fast-forward 통합했다. 통합 기준은 `0632859`, 동작 코드 기준은 `64be426`이다.
+  `feat/chatbot`으로 fast-forward 통합했다. 통합·문서 기록 기준은 `75dc070`, 동작 코드 기준은
+  `64be426`이다.
 - 최신 검증은 offline 전체 PASS, full live 119/119, critical 13/13, 위치 후속 누락 점검
   4/4, ChannelTalk 실대화 158건, Production build PASS, lint 0 errors/24 warnings다.
-- 최신 검증 Preview는 `ehwa-website-ql6xyd68n-remo-dev.vercel.app`, `Ready`, 보호 적용,
+- 최신 기준 브랜치 Preview는 `ehwa-website-e7jk4qp7v-remo-dev.vercel.app`, `Ready`, 보호 적용,
   `namespace=preview`, 한도 396, KB 59문서·254청크, model/embedding configured 상태다.
+- 최초 기준 브랜치 배포는 전역 Preview 기본값(`limit=500`, embedding 미설정)을 상속했다. 이후
+  `feat/chatbot` 전용 Preview 환경을 개선 브랜치와 동일하게 설정하고 재배포해 드리프트를 해소했다.
 - 실대화 158건 중 fallback 11건은 타 병원·내부 로직·근거 없는 지도/택시 위치·무의미 입력으로
   모두 보수적 거절이 적절했다. 답변 가능한 질문의 fallback은 0건이다.
 - Git Markdown 재적재 기준 예상질문은 268개이며 Top-1·Top-3 268/268이다.
