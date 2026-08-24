@@ -9,14 +9,11 @@
  *       npm run ct:replay -- --retry (직전 결과에서 model_error 였던 항목만 재실행·병합)
  */
 import { readFileSync, writeFileSync, existsSync } from "fs"
+import { BUTTON_LABELS, STATES } from "./ct-export.mts"
 
 const BASE = process.env.QA_BASE ?? "http://localhost:3112"
 const EXPORT = "docs/chatbot-assets/channeltalk-export"
 const OUT = `${EXPORT}/replay-result.json`
-
-const BUTTONS = new Set(["질문하기","처음으로","지원 범위","이용 대상","신청 방법","비용안내","비용 안내",
-  "운영 시간 & 위치","이전으로","온라인 신청서","카카오톡 상담","전화","이메일","병원 방문",
-  "다른 방법으로 신청","신청서 작성하기"])
 
 function mask(t: string): string {
   return t
@@ -47,6 +44,10 @@ async function ask(q: string, sessionId: string, history: Turn[]) {
   return { source: "error", answer: "" }
 }
 
+const manifest = JSON.parse(readFileSync(`${EXPORT}/manifest.json`, "utf8"))
+if (!Array.isArray(manifest.states) || manifest.states.join(",") !== STATES.join(",")) {
+  throw new Error(`incomplete ChannelTalk export states: ${JSON.stringify(manifest.states)}`)
+}
 const chats = JSON.parse(readFileSync(`${EXPORT}/user-chats.json`, "utf8"))
 const msgs = JSON.parse(readFileSync(`${EXPORT}/messages.json`, "utf8"))
 const retryMode = process.argv.includes("--retry")
@@ -62,7 +63,7 @@ for (const c of chats) {
     const m = ms[i]
     if (m.personType !== "user") continue
     const q = (m.plainText ?? "").trim()
-    if (!q || BUTTONS.has(q)) continue
+    if (!q || BUTTON_LABELS.has(q)) continue
 
     // 채널톡측 답변: 다음 user 발화 전까지의 bot 텍스트
     const ct: string[] = []
