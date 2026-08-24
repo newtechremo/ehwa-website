@@ -13,6 +13,8 @@
     "test:runtime": "tsx scripts/runtime-test.mts",
     "test:budget": "psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f supabase/tests/chatbot_budget.sql",
     "test:ct-export": "tsx scripts/ct-export-test.mts",
+    "retrieval:test": "tsx scripts/retrieval-test.mts",
+    "retrieval:eval": "tsx scripts/retrieval-eval.mts",
     "qa:critical": "tsx scripts/qa-critical.mts",
     "db:start": "supabase start",
     "db:stop": "supabase stop",

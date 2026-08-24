@@ -11,6 +11,7 @@ import { KB_DIRECT_THRESHOLD, loadKb, rankKb } from "@/lib/chatbot/kb"
 import { logChat } from "@/lib/chatbot/log"
 import { resolveModel } from "@/lib/chatbot/model"
 import { checkRateLimit, clientKey, consumeDailyBudget } from "@/lib/chatbot/ratelimit"
+import { retrieveContext } from "@/lib/chatbot/retrieval"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -160,24 +161,15 @@ export async function POST(request: Request) {
     )
   }
 
+  const retrieved = await retrieveContext(question, sessionId, docs)
+  if (retrieved.status === "budget_exhausted") return fallback("daily_limit")
+  if (retrieved.status === "budget_unavailable") return fallback("budget_unavailable")
+  if (!retrieved.context) return fallback("unanswerable")
+  const context = retrieved.context
+
   const budget = await consumeDailyBudget(sessionId, "generation")
   if (budget.status === "exhausted") return fallback("daily_limit")
   if (budget.status === "unavailable") return fallback("budget_unavailable")
-
-  // KB 전문을 한 번에 넣는다.
-  //
-  // 2단계(라우터로 후보 선별 → 생성)를 먼저 시도했으나 구조적 한계가 있었다.
-  // 라우터에게 제목·예상질문만 보여주면 본문에만 있는 정보를 못 찾는다.
-  // 실측: "엘리베이터 어디 있어요" → NONE. 실제로는 45·57·59 문서 본문에 있다.
-  // 코퍼스가 59문서 약 21,500토큰뿐이라 전문을 매 요청에 넣어도
-  // 모델 컨텍스트의 2%이고 질문당 약 $0.0065다. 선별 단계를 없애면
-  // "검색이 못 찾아서 답을 못 하는" 실패 유형 자체가 사라진다.
-  //
-  // 문서 번호로 라벨링한다. 근거 표기를 긴 한글 문서키로 요구하면 모델이
-  // 정확히 되풀이하지 못해 검증에서 탈락하는 일이 잦다(실측: no_citation 다발).
-  const context = docs
-    .map((d) => `<문서 ${d.seq}> ${d.topic}\n${d.answer}`)
-    .join("\n\n---\n\n")
 
   const system = [
     "당신은 이대목동병원 장애인 이용편의 지원사업의 안내 챗봇 '편의지원 매니저'입니다.",

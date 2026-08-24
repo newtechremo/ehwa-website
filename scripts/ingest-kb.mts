@@ -9,8 +9,11 @@
  */
 import "./load-env.mts"
 import { readFileSync, readdirSync } from "fs"
+import { createHash } from "node:crypto"
 import path from "path"
 import { createClient } from "@supabase/supabase-js"
+import { embedMany } from "ai"
+import { resolveEmbeddingModel } from "../lib/chatbot/model"
 
 const DIR = "docs/chatbot-assets/kb_md"
 
@@ -84,6 +87,13 @@ if (!url || !key) {
 }
 console.log(`  대상: ${useProd ? "운영" : "로컬"} ${url}`)
 
+const hostname = new URL(url).hostname
+const isLocal = hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1"
+if ((useProd && isLocal) || (!useProd && !isLocal)) {
+  console.error(`  대상 불일치: --prod=${useProd}, hostname=${hostname}`)
+  process.exit(1)
+}
+
 const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
 
 const { error } = await db.from("kb_documents").upsert(
@@ -101,3 +111,88 @@ console.log(`  적재 완료 — kb_documents ${count}건`)
 const byCat = docs.reduce<Record<string, number>>((a, d) => ((a[d.category] = (a[d.category] ?? 0) + 1), a), {})
 console.log("  카테고리별:", Object.entries(byCat).map(([k, v]) => `${k} ${v}`).join(" · "))
 console.log(`  예상질문 총 ${docs.reduce((n, d) => n + d.questions.length, 0)}개`)
+
+function splitSections(answer: string): string[] {
+  const sections = answer.split(/(?=^##\s)/m).map((part) => part.trim()).filter(Boolean)
+  return sections.flatMap((section) => {
+    if (section.length <= 1800) return [section]
+    const chunks: string[] = []
+    let current = ""
+    for (const paragraph of section.split(/\n{2,}/)) {
+      if (paragraph.length > 1800) {
+        if (current) chunks.push(current)
+        current = ""
+        for (let start = 0; start < paragraph.length; start += 1800) chunks.push(paragraph.slice(start, start + 1800))
+      } else if (!current || current.length + paragraph.length + 2 <= 1800) {
+        current += `${current ? "\n\n" : ""}${paragraph}`
+      } else {
+        chunks.push(current)
+        current = paragraph
+      }
+    }
+    if (current) chunks.push(current)
+    return chunks
+  })
+}
+
+const model = resolveEmbeddingModel()
+if (!model) {
+  console.log("  embedding 생략 — CHATBOT_EMBEDDING_MODEL/API key 확인")
+  process.exit(0)
+}
+
+const { data: documentRows, error: documentError } = await db.from("kb_documents").select("id, doc_key")
+if (documentError || !documentRows) throw new Error(`문서 ID 조회 실패: ${documentError?.message}`)
+const documentIds = new Map(documentRows.map((row) => [row.doc_key, row.id as number]))
+
+const desired = docs.flatMap((doc) => splitSections(doc.answer).map((section, chunk_index) => {
+  const document_id = documentIds.get(doc.doc_key)
+  if (!document_id) throw new Error(`문서 ID 없음: ${doc.doc_key}`)
+  const content = `${doc.topic}\n${section}`
+  const embeddingInput = `${doc.topic}\n${doc.questions.join("\n")}\n${section}`
+  return {
+    document_id,
+    chunk_index,
+    content,
+    content_hash: createHash("sha256").update(embeddingInput).digest("hex"),
+    embeddingInput,
+  }
+}))
+
+const { data: existingRows, error: existingError } = await db
+  .from("kb_chunks")
+  .select("document_id, chunk_index, content_hash")
+if (existingError || !existingRows) throw new Error(`기존 chunk 조회 실패: ${existingError?.message}`)
+const existing = new Map(existingRows.map((row) => [`${row.document_id}:${row.chunk_index}`, row.content_hash]))
+const changed = desired.filter((chunk) => existing.get(`${chunk.document_id}:${chunk.chunk_index}`) !== chunk.content_hash)
+
+if (changed.length) {
+  const { embeddings } = await embedMany({
+    model,
+    values: changed.map((chunk) => chunk.embeddingInput),
+    providerOptions: { google: { outputDimensionality: 768, taskType: "RETRIEVAL_DOCUMENT" } },
+  })
+  if (embeddings.length !== changed.length) throw new Error("embedding 응답 수가 chunk 수와 다릅니다")
+  const { error: chunkError } = await db.from("kb_chunks").upsert(
+    changed.map((chunk, index) => ({
+      document_id: chunk.document_id,
+      chunk_index: chunk.chunk_index,
+      content: chunk.content,
+      content_hash: chunk.content_hash,
+      embedding: embeddings[index],
+      updated_at: new Date().toISOString(),
+    })),
+    { onConflict: "document_id,chunk_index" },
+  )
+  if (chunkError) throw new Error(`chunk 적재 실패: ${chunkError.message}`)
+}
+
+for (const [document_id, indexes] of Map.groupBy(desired, (chunk) => chunk.document_id)) {
+  const keep = indexes.map((chunk) => chunk.chunk_index)
+  const { error: deleteError } = await db.from("kb_chunks")
+    .delete()
+    .eq("document_id", document_id)
+    .not("chunk_index", "in", `(${keep.join(",")})`)
+  if (deleteError) throw new Error(`삭제 chunk 정리 실패: ${deleteError.message}`)
+}
+console.log(`  chunk ${desired.length}건 — embedding 호출 대상 ${changed.length}건`)

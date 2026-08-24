@@ -18,6 +18,9 @@ npm run lint     # ESLint (현재 의존성/Flat Config 미설정, 최신 실행
 npx tsc --noEmit # Next build가 건너뛰는 TypeScript 독립 검사
 npm run test:chatbot # 정책·FAQ 라우팅 회귀
 npm run kb:eval      # 로컬 Supabase KB 검색 평가
+CHATBOT_EMBEDDING_MODEL=gemini-embedding-001 npm run kb:ingest # 변경 chunk만 768차원 embedding 적재
+CHATBOT_EMBEDDING_MODEL=gemini-embedding-001 npm run retrieval:eval # 하이브리드 검색 holdout
+npm run retrieval:test # RRF와 12,000자 문맥 상한 순수 검증
 npm run qa           # dev 서버 대상 현재 qa-set 전체 API QA (문항 수 하드코딩 금지)
 npm run qa:critical  # 핵심 답변 전체 계약을 반복 검증 (자동 재시도 없음)
 npm run test:runtime # KST 날짜와 usage namespace 검증

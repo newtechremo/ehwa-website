@@ -1,5 +1,5 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
-import type { LanguageModel } from "ai"
+import type { EmbeddingModel, LanguageModel } from "ai"
 
 /**
  * 챗봇이 쓸 LLM을 결정한다.
@@ -33,4 +33,17 @@ export function resolveModel(): ModelChoice | null {
 
   // 문자열을 그대로 넘기면 AI SDK가 Gateway로 라우팅한다
   return { model: id as unknown as LanguageModel, provider: "ai-gateway", id }
+}
+
+export function resolveEmbeddingModel(): EmbeddingModel | null {
+  const id = process.env.CHATBOT_EMBEDDING_MODEL?.trim()
+  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim()
+  if (!id || !apiKey) return null
+  const google = createGoogleGenerativeAI({ apiKey })
+  return google.embedding(id.replace(/^google\//, ""))
+}
+
+export function providerErrorCode(error: unknown): string {
+  const value = error as { statusCode?: unknown; code?: unknown; name?: unknown }
+  return String(value?.statusCode ?? value?.code ?? value?.name ?? "unknown").slice(0, 64)
 }
