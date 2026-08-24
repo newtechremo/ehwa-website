@@ -325,6 +325,17 @@ export const FALLBACK_ANSWER =
 
 export const FALLBACK_ACTION_IDS = ["tel", "kakao"]
 
+/**
+ * AI 가 "몰라서"가 아니라 "일시적으로 못 써서"(일일 한도·모델 장애) 내려가는 경우의 문구.
+ * 기존에는 이때도 "추측해서 답변드리지 않을게요"가 나가 이용자가 챗봇이 고장났다고
+ * 오해했다(2026-08-24 실사용 지적). 버튼·FAQ 는 계속 동작한다는 안내를 함께 준다.
+ */
+export const FALLBACK_ANSWER_TEMPORARY =
+  "지금은 문의가 많아 AI 상세 답변이 잠시 어려워요. 🙏\n" +
+  "아래 버튼 메뉴에서 주요 안내를 바로 보실 수 있고,\n" +
+  "급하신 내용은 편의지원팀으로 문의해 주세요."
+
+
 export function getAction(id: string): ChatAction | undefined {
   return ACTIONS.find((a) => a.id === id)
 }

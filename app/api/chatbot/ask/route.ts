@@ -3,6 +3,7 @@ import { generateText } from "ai"
 import {
   FALLBACK_ACTION_IDS,
   FALLBACK_ANSWER,
+  FALLBACK_ANSWER_TEMPORARY,
   getActions,
 } from "@/lib/chatbot/content"
 import { routeFreeText } from "@/lib/chatbot/engine"
@@ -78,12 +79,15 @@ export async function POST(request: Request) {
    * 응답 반환 직후 함수가 정지되면 인서트가 유실된다(실측: Preview 질문 5건 중
    * 로그 4행). after() 는 응답 완료 후에도 콜백 완료를 플랫폼이 보장한다.
    */
+  // "몰라서 거절"과 "일시적으로 AI 를 못 써서 강등"은 이용자에게 다른 문구로 보인다.
+  const TEMPORARY_REASONS = new Set(["daily_limit", "model_error", "ai_unavailable"])
   const fallback = (reason: string, detail?: string) => {
+    const answer = TEMPORARY_REASONS.has(reason) ? FALLBACK_ANSWER_TEMPORARY : FALLBACK_ANSWER
     after(() => logChat({
       sessionId,
       kind: "fallback",
       userInput: question,
-      answer: FALLBACK_ANSWER,
+      answer,
       fallbackReason: reason,
       latencyMs: Date.now() - startedAt,
     }))
@@ -91,7 +95,7 @@ export async function POST(request: Request) {
       source: "fallback",
       reason,
       ...(detail ? { detail } : {}),
-      answer: FALLBACK_ANSWER,
+      answer,
       actions: getActions(FALLBACK_ACTION_IDS) ?? null,
       refId: null,
       docIds: [],
@@ -186,6 +190,12 @@ export async function POST(request: Request) {
     "",
     "절대 규칙:",
     "1. 아래 [참고 문서]에 있는 내용만으로 답하세요. 문서에 없으면 추측하지 마세요.",
+    // 실사용 실측(2026-08-24): "지원되는 교통 서비스는?" 이 거절됐다. KB 는 전부
+    // '이동·동행'이라는 낱말을 쓰는데 이용자는 '교통'이라고 묻는다. 낱말이 아니라
+    // 뜻으로 문서를 찾되, 새로운 사실을 만드는 것은 여전히 금지다.
+    "   단, 이용자의 낱말이 문서와 달라도 뜻이 같으면 그 문서로 답하세요.",
+    "   (예: '교통/차편 지원' ≈ 이동·동행 지원, '통역' ≈ 수어·의사소통 지원)",
+    "   이때 문서에 적힌 범위 제한(예: 병원 건물 내부 한정)도 함께 안내하세요.",
     "2. 의학적 진단·처방·치료 판단은 절대 하지 마세요.",
     "3. 전화번호·운영시간·주소·비용은 문서에 적힌 값을 그대로 쓰고 절대 지어내지 마세요.",
     "4. 답변 마지막 줄에 반드시 근거 문서 번호를 `[출처: 12]` 형식으로 표기하세요. 여러 개면 `[출처: 12, 34]`.",
