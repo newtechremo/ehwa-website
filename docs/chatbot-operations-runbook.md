@@ -3,12 +3,17 @@
 ## 현재 전환 상태
 
 - Production은 계속 ChannelTalk을 사용한다.
-- 자체 챗봇은 Preview 검증과 병원 문구·UI 승인 전까지 Production에서 켜지 않는다.
-- 2026-08-24 로컬 기준: critical 10/10, full 82/82, retrieval 10/10 Top-3.
-- 최신 Preview: commit `26e9552`, `Ready`, 보호 302, namespace `preview`, 한도 396,
-  KB 59, critical 10/10이다.
-- 전체 상담 replay 163건에서 개선 후보 fallback 20건이 남아 **Production 전환은 차단**한다.
-- Git Markdown 재적재 기준 예상질문은 현재 285개다. 과거 로컬 DB의 297개와 달랐으므로 DB 행 수가 아니라 Git 원문과 ingest 결과를 기준으로 검수한다.
+- 개선 브랜치 `feat/chatbot-rag-reliability`는 2026-08-24 23:25 KST에 실제 기준 브랜치
+  `feat/chatbot`으로 fast-forward 통합했다. 통합 기준은 `0632859`, 동작 코드 기준은 `64be426`이다.
+- 최신 검증은 offline 전체 PASS, full live 119/119, critical 13/13, 위치 후속 누락 점검
+  4/4, ChannelTalk 실대화 158건, Production build PASS, lint 0 errors/24 warnings다.
+- 최신 검증 Preview는 `ehwa-website-ql6xyd68n-remo-dev.vercel.app`, `Ready`, 보호 적용,
+  `namespace=preview`, 한도 396, KB 59문서·254청크, model/embedding configured 상태다.
+- 실대화 158건 중 fallback 11건은 타 병원·내부 로직·근거 없는 지도/택시 위치·무의미 입력으로
+  모두 보수적 거절이 적절했다. 답변 가능한 질문의 fallback은 0건이다.
+- Git Markdown 재적재 기준 예상질문은 268개이며 Top-1·Top-3 268/268이다.
+- 자체 챗봇은 실제 브라우저·모바일·스크린리더 QA, 병원 문구·링크·전화 승인, 개인정보
+  최소수집 보강 전까지 Production에서 켜지 않는다.
 
 ## 환경과 사용량 namespace
 
@@ -50,17 +55,19 @@ npm run chatbot:report -- --day YYYY-MM-DD --namespace qa-local --limit 1000
 ```
 
 - `qa:offline`은 외부 AI 비용이 없다.
-- `qa:critical`은 현재 핵심 질문을 KB에서 직접 답하므로 모델 호출이 0이어야 한다.
+- `qa:critical`은 현재 핵심 질문을 KB에서 직접 답하므로 모델 호출이 0이어야 한다. 현재
+  13/13은 통과했지만 `tests/chatbot-critical-answers.json` 마지막 위치 후속 4건에는 `repeat`가
+  없어 실행기가 건너뛴다. 4건은 별도 Preview 점검에서 4/4 통과했으며, 출시 전 canary 정의를
+  수정해야 한다.
 - `qa:full`은 health의 namespace와 최악 비용(`문항 수 × 2`)을 먼저 확인하며 자동 재시도하지 않는다.
 - full 결과는 ignored 경로에 저장된다. `qa:result`는 commit, set SHA-256, 문항/결과 수, 실패 0건을 모두 검사한다.
 - 커밋 후 기존 결과는 즉시 stale이 된다. 현재 commit에서 다시 실행하지 않은 결과를 승인자료로 쓰지 않는다.
 - Preview에서는 critical만, Production에서는 승인된 synthetic 질문 1건만 실행한다.
 
-2026-08-24 실제 `qa-local` 사용량은 full QA 전 394에서 full 82문항 후 522,
-ChannelTalk 163문항 replay 후 790으로 증가했다. 증가 396회는 full의 128회와 replay의
-268회 합계와 정확히 같다. 따라서 같은 namespace에서 관찰된 대량 사용량은 사람 채팅이 아니라
-agent QA가 만든 것이다. 과거 500회도 반복 QA와 당시 재시도 경로로 설명되며, 결제 연결 여부와
-무관하다.
+2026-08-24 사고 당시 내부 한도 500회 중 자동 QA·replay가 485회, 수정 확인 probe까지
+포함하면 498회를 사용했다. 사람 브라우저의 AI 예산 소비는 0회였다. 현재는 `qa-local`과
+`preview`를 분리하므로 같은 사고를 사람 QA에 전파하지 않는다. 상세 역산은
+`자체챗봇_개선실행방안_및_AI한도_소진원인분석_20260824.md`를 기준으로 한다.
 
 ## 사용량과 장애 진단
 
@@ -112,3 +119,5 @@ select adjust_chatbot_budget(
 - ChannelTalk 원본, 메시지, QA/replay 결과는 `docs/chatbot-assets/channeltalk-export/` 밖으로 복사하거나 commit하지 않는다.
 - 파생 질문·답변은 `maskPII()`를 통과시킨다.
 - 대화 로그는 기본 90일 보관 후 보호된 purge cron으로 삭제한다.
+- 현재 `maskPII()`는 주민번호·카드·전화·이메일은 가리지만 이름, 서술형 생년월일, 장애·질환
+  정보는 남을 수 있다. Production 전 최소수집·동의·추가 마스킹 또는 원문 비저장 정책을 승인한다.
