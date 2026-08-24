@@ -239,6 +239,52 @@ export function rankKb(input: string, docs: KbDoc[], limit = 5): KbHit[] {
   return hits.slice(0, limit)
 }
 
+const LOCATION_QUERY_WORDS = new Set([
+  "어디", "위치", "알려", "알려줘", "알려주세", "어떻게", "가", "가요", "있어", "있어요",
+  "위주", "지금", "현재", "응응", "이동", "동선", "병원",
+  "고마워", "고맙습니다", "감사해", "감사합니다",
+])
+const LOCATION_CONTEXT_WORDS = new Set([
+  "본관", "별관", "정문", "후문", "주차장", "응급실", "앞", "엘베", "엘리베이터",
+])
+
+/** 구조화된 위치 문서의 소제목 중 현재 대화와 가장 구체적으로 맞는 원문 경로를 고른다. */
+export function selectLocationAnswer(doc: KbDoc, inputs: string[]): string | null {
+  const terms = [...new Set(inputs.flatMap((text) => text.toLowerCase().split(/[^0-9a-z가-힣]+/))
+    .map((term) => term.replace(/(?:이에요|예요|에요|에서|으로|에게|한테|까지|부터|에는|은|는|이|가|을|를|에|도|만|요|로)$/, ""))
+    .filter((term) => term.length >= 2 && !LOCATION_QUERY_WORDS.has(term) &&
+      !/^(?:어디|어딘|알려|어떻게|가고싶|있(?:어|나|니))/.test(term)))]
+  if (!terms.length) return null
+  const matchesTerm = (value: string, term: string) => {
+    const floor = term.match(/^(\d+)\s*층$/)
+    return floor
+      ? new RegExp(`(?:^|\\s|[()])${floor[1]}\\s*층`).test(value)
+      : normalize(value).includes(normalize(term))
+  }
+
+  let best: { section: string; header: string; score: number; index: number } | null = null
+  for (const section of doc.answer.split(/(?=^##\s)/m)) {
+    const header = section.match(/^##\s+(.+)$/m)?.[1]?.trim()
+    if (!header) continue
+    const knowledgeKey = normalize(`${doc.topic}\n${section}`)
+    const specificTerms = terms.filter((term) => !LOCATION_CONTEXT_WORDS.has(term) &&
+      !/^(?:(?:본관|별관).*)?\d+\s*층/.test(term))
+    const score = terms.filter((term) => matchesTerm(header, term)).length * 2 +
+      specificTerms.filter((term) => knowledgeKey.includes(normalize(term))).length
+    const hasDestination = specificTerms.length > 0 && specificTerms.every((term) => knowledgeKey.includes(normalize(term)))
+    if (hasDestination && score > (best?.score ?? 0)) best = { section: section.trim(), header, score, index: doc.answer.indexOf(section) }
+  }
+  if (!best) return null
+
+  const parents = [...doc.answer.slice(0, best.index).matchAll(/^#\s+(.+)$/gm)]
+  const parent = parents.at(-1)?.[1]?.trim() ?? ""
+  const prefix = !/(본관|별관|정문|주차장|응급실)/.test(best.header) && /(본관|별관).*층/.test(parent)
+    ? `# ${parent}\n\n`
+    : ""
+  const map = "https://mokdong.eumc.ac.kr/guide/preview.do?floor=1F"
+  return `${prefix}${best.section}${best.section.includes(map) ? "" : `\n\n층별 상세 안내도: ${map}`}`
+}
+
 /**
  * 이 점수 이상이면 LLM 없이 '답변 가이드'를 그대로 내보낸다.
  *

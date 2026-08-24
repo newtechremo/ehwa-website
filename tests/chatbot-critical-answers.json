@@ -46,6 +46,39 @@
       "forbidden": [{ "id": "barrier-free-generic", "exact": ["https://walla.my/a/barrierfree_v"] }]
     },
     {
+      "id": "replay-referral-missing",
+      "question": "요양급여의뢰서를 안가지고 왔어요",
+      "allowedSources": ["kb"],
+      "repeat": 1,
+      "expectedAttempts": { "embedding": 0, "generation": 0, "model": 0 },
+      "required": [
+        { "id": "deadline", "all": ["진료 당일", "제출"] },
+        { "id": "insurance", "all": ["건강보험", "전액 본인 부담"] },
+        { "id": "no-refund", "all": ["소급", "환급되지 않"] }
+      ]
+    },
+    {
+      "id": "replay-general-reception",
+      "question": "접수는 어디서해?",
+      "allowedSources": ["kb"],
+      "repeat": 1,
+      "expectedAttempts": { "embedding": 0, "generation": 0, "model": 0 },
+      "required": [
+        { "id": "first-visit", "all": ["1층", "첫진료 라운지", "접수"] }
+      ]
+    },
+    {
+      "id": "replay-medicine-pickup",
+      "question": "약은 어디서 받아?",
+      "allowedSources": ["kb"],
+      "repeat": 1,
+      "expectedAttempts": { "embedding": 0, "generation": 0, "model": 0 },
+      "required": [
+        { "id": "outside", "all": ["원외 처방", "병원 밖 약국"] },
+        { "id": "inside", "all": ["원내 처방", "병원 내 약국"] }
+      ]
+    },
+    {
       "id": "home-nursing-paraphrase",
       "question": "가정간호 서비스 신청은 어떻게 하나요?",
       "allowedSources": ["kb"],
@@ -54,6 +87,59 @@
       "required": [
         { "id": "doctor-order", "all": ["주치의", "처방"] },
         { "id": "office", "exact": ["02-2650-5087"] }
+      ]
+    },
+    {
+      "id": "replay-emergency-location",
+      "question": "응급실 앞",
+      "allowedSources": ["kb"],
+      "expectedAttempts": { "embedding": 0, "generation": 0, "model": 0 },
+      "required": [
+        { "id": "destination", "all": ["소아청소년과"] },
+        { "id": "main-second-floor", "all": ["본관", "2층"] },
+        { "id": "annex-b", "all": ["별관 B"] }
+      ]
+    },
+    {
+      "id": "replay-elevator-emergency",
+      "question": "응응 엘베 위주로",
+      "allowedSources": ["kb"],
+      "expectedAttempts": { "embedding": 0, "generation": 0, "model": 0 },
+      "required": [
+        { "id": "destination", "all": ["소아청소년과"] },
+        { "id": "elevator", "any": ["엘리베이터", "엘베"] },
+        { "id": "connection", "all": ["연결통로"] },
+        { "id": "annex-b", "all": ["별관 B"] }
+      ]
+    },
+    {
+      "id": "replay-annex-b8",
+      "question": "별관B동 8층이에요",
+      "allowedSources": ["kb"],
+      "expectedAttempts": { "embedding": 0, "generation": 0, "model": 0 },
+      "required": [
+        { "id": "destination", "all": ["소화기내과"] },
+        { "id": "main-second-floor", "all": ["본관", "2층"] },
+        { "id": "connection", "all": ["연결통로"] },
+        { "id": "annex-b-connection", "any": ["정신건강의학과", "MCC B"] }
+      ],
+      "forbidden": [
+        { "id": "wrong-annex-a-connection", "all": ["인공신장실"] },
+        { "id": "unneeded-first-floor", "all": ["1층으로 내려"] }
+      ]
+    },
+    {
+      "id": "replay-elevator-parking",
+      "question": "엘베요",
+      "allowedSources": ["kb"],
+      "expectedAttempts": { "embedding": 0, "generation": 0, "model": 0 },
+      "required": [
+        { "id": "destination", "all": ["소화기내과"] },
+        { "id": "elevator", "any": ["엘리베이터", "엘베"] },
+        { "id": "left-corridor", "all": ["왼쪽", "복도"] }
+      ],
+      "forbidden": [
+        { "id": "wrong-center", "all": ["소화기내시경센터"] }
       ]
     }
   ]

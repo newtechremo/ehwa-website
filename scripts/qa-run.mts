@@ -30,7 +30,12 @@ if (health.kbCount !== 59 || !health.modelConfigured || !health.embeddingConfigu
   throw new Error(`full QA preflight incomplete: kb=${health.kbCount ?? "?"} model=${Boolean(health.modelConfigured)} embedding=${Boolean(health.embeddingConfigured)}`)
 }
 
-type Item = { id: string; q: string; expect: number[] | string }
+type Item = {
+  id: string
+  q: string
+  expect: number[] | string
+  history?: Array<{ role: "user" | "assistant"; text: string }>
+}
 type Result = {
   id: string
   q: string
@@ -59,7 +64,7 @@ async function ask(item: Item, kind: "kb" | "policy" | "refuse") {
     const response = await fetch(`${BASE}/api/chatbot/ask`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...bypassHeader },
-      body: JSON.stringify({ question: item.q, sessionId: `qa-full-${item.id}` }),
+      body: JSON.stringify({ question: item.q, sessionId: `qa-full-${item.id}`, history: item.history }),
       signal: AbortSignal.timeout(90_000),
     })
     data = await response.json().catch(() => ({}))

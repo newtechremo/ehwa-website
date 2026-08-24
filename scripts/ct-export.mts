@@ -6,7 +6,7 @@ export const STATES = ["initial", "opened", "snoozed", "closed"] as const
 export const BUTTON_LABELS = new Set([
   "질문하기", "처음으로", "지원 범위", "이용 대상", "신청 방법", "비용안내", "비용 안내",
   "운영 시간 & 위치", "이전으로", "온라인 신청서", "카카오톡 상담", "전화", "이메일", "병원 방문",
-  "다른 방법으로 신청", "신청서 작성하기",
+  "카카오톡", "메일", "병원방문", "다른 방법으로 신청", "신청서 작성하기",
 ])
 const LIMIT = 500
 const API = "https://api.channel.io/open/v5"

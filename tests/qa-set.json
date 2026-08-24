@@ -464,6 +464,250 @@
         23
       ],
       "why": "실사용 질문(2026-08-24). daily_limit 소진 중 접수돼 임시 문구 결함을 드러냈다."
+    },
+    {
+      "id": "replay-help",
+      "q": "뭘 물어봐야해?",
+      "expect": [1]
+    },
+    {
+      "id": "replay-map",
+      "q": "혹시 지도 있어?",
+      "expect": [45]
+    },
+    {
+      "id": "replay-reservation-check",
+      "q": "예약을 확인하고 싶어",
+      "expect": [46]
+    },
+    {
+      "id": "replay-other-map",
+      "q": "다른 안내 지도는 없어요?",
+      "expect": [45]
+    },
+    {
+      "id": "replay-location-annex",
+      "q": "별관B동 8층이에요",
+      "expect": [45],
+      "history": [
+        { "role": "user", "text": "소화기내과 어떻게 가요?" },
+        { "role": "assistant", "text": "현재 위치를 알려주세요." }
+      ]
+    },
+    {
+      "id": "replay-entrance-ent",
+      "q": "정문",
+      "expect": [45],
+      "history": [
+        { "role": "user", "text": "이비인후과 어디에 있어요?" },
+        { "role": "assistant", "text": "현재 위치를 알려주세요." }
+      ]
+    },
+    {
+      "id": "replay-blood-room",
+      "q": "채혈실이 어디에있어요?",
+      "expect": [45]
+    },
+    {
+      "id": "replay-entrance-blood-room",
+      "q": "정문",
+      "expect": [45],
+      "history": [
+        { "role": "user", "text": "채혈실이 어디에 있어요?" },
+        { "role": "assistant", "text": "현재 위치를 알려주세요." }
+      ]
+    },
+    {
+      "id": "replay-driving",
+      "q": "자동차로 가려면 어떻게 해야해?",
+      "expect": [12, 36, 37]
+    },
+    {
+      "id": "replay-gi-location",
+      "q": "고마워 소화기내과 위치 알려줘",
+      "expect": [45]
+    },
+    {
+      "id": "replay-entrance-gi",
+      "q": "정문",
+      "expect": [45],
+      "history": [
+        { "role": "user", "text": "소화기내과 위치 알려줘" },
+        { "role": "assistant", "text": "현재 위치를 알려주세요." }
+      ]
+    },
+    {
+      "id": "replay-disability-types",
+      "q": "지원가능한 장애유형은 뭐뭐있어?",
+      "expect": [7]
+    },
+    {
+      "id": "replay-after-reservation",
+      "q": "예약 후에는 어떻게 하면 되나요?",
+      "expect": [46]
+    },
+    {
+      "id": "replay-no-card",
+      "q": "장애복지카드가 없어도 가능해?",
+      "expect": [8]
+    },
+    {
+      "id": "replay-ack-location",
+      "q": "응응",
+      "expect": [45],
+      "history": [
+        { "role": "user", "text": "나는 지금 본관 1층에 있어" },
+        { "role": "assistant", "text": "가까운 장애인 화장실은 본관 1층 정형외과 앞이에요.\n병원 내부 길찾기 지도가 필요하신가요?" }
+      ]
+    },
+    {
+      "id": "replay-ack-map",
+      "q": "응 지도 알려줘",
+      "expect": [45],
+      "history": [
+        { "role": "user", "text": "소화기내과 위치 알려줘" },
+        { "role": "assistant", "text": "현재 위치를 알려주세요." }
+      ]
+    },
+    {
+      "id": "replay-parking-location",
+      "q": "주차장에 있어요",
+      "expect": [45],
+      "history": [
+        { "role": "user", "text": "소화기내과 어떻게 가요?" },
+        { "role": "assistant", "text": "현재 위치를 알려주세요." }
+      ]
+    },
+    {
+      "id": "replay-show-map",
+      "q": "지도 보여주세요",
+      "expect": [45],
+      "history": [
+        { "role": "user", "text": "투석실 어디에 있어요?" },
+        { "role": "assistant", "text": "현재 위치를 알려주세요." }
+      ]
+    },
+    {
+      "id": "replay-project-name",
+      "q": "장애편의지원사업이요",
+      "expect": [2]
+    },
+    {
+      "id": "replay-elevator-emergency",
+      "q": "응응 엘베 위주로",
+      "expect": [45],
+      "history": [
+        { "role": "user", "text": "청소년과 위치 알려줘" },
+        { "role": "assistant", "text": "소아청소년과는 별관 B동 2층이에요." },
+        { "role": "user", "text": "응급실 앞" },
+        { "role": "assistant", "text": "추가로 도움이 필요하신가요?" }
+      ]
+    },
+    {
+      "id": "replay-emergency-location",
+      "q": "응급실 앞",
+      "expect": [45],
+      "history": [
+        { "role": "user", "text": "청소년과 위치 알려줘" },
+        { "role": "assistant", "text": "소아청소년과는 별관 B동 2층에 있어요." }
+      ]
+    },
+    {
+      "id": "replay-annex-b8",
+      "q": "별관B동 8층이에요",
+      "expect": [45],
+      "history": [
+        { "role": "user", "text": "소화기 내과 어떻게 가" },
+        { "role": "assistant", "text": "현재 위치를 알려주시면 자세한 동선을 안내해 드릴게요." }
+      ]
+    },
+    {
+      "id": "replay-elevator-parking",
+      "q": "엘베요",
+      "expect": [45],
+      "history": [
+        { "role": "user", "text": "소화기내과는 어떻게 가요?" },
+        { "role": "assistant", "text": "현재 위치를 알려주세요." },
+        { "role": "user", "text": "주차장에 있어요" },
+        { "role": "assistant", "text": "주차장에서 소화기내과까지 이동 동선을 안내해 드릴까요?" }
+      ]
+    },
+    {
+      "id": "replay-referral-missing",
+      "q": "요양급여의뢰서를 안가지고 왔어요",
+      "expect": [48]
+    },
+    {
+      "id": "replay-related-service",
+      "q": "연관된 서비스나 센터가 있어요?",
+      "expect": [2]
+    },
+    {
+      "id": "replay-context-application",
+      "q": "응 그래 그럼 신청은 어떻게 해?",
+      "expect": [3]
+    },
+    {
+      "id": "replay-reservation-preparation",
+      "q": "예약 후에 뭘 준비해가면되는거야?",
+      "expect": [46]
+    },
+    {
+      "id": "replay-general-reception",
+      "q": "접수는 어디서해?",
+      "expect": [47]
+    },
+    {
+      "id": "replay-medicine-pickup",
+      "q": "약은 어디서 받아?",
+      "expect": [47]
+    },
+    {
+      "id": "replay-child-nospace",
+      "q": "소아청소년과 가고싶어요",
+      "expect": [45]
+    },
+    {
+      "id": "replay-restroom-context",
+      "q": "나는 지금 본관 1층에 있어",
+      "expect": [43],
+      "history": [
+        { "role": "user", "text": "장애인 화장실은 어디에 있나요?" },
+        { "role": "assistant", "text": "본관과 별관에 있습니다. 현재 위치를 알려주세요." }
+      ]
+    },
+    {
+      "id": "replay-restroom-floor-only",
+      "q": "지금 1층이에요",
+      "expect": [43],
+      "history": [
+        { "role": "user", "text": "장애인 화장실은 어디에있어?" },
+        { "role": "assistant", "text": "본관과 별관에 있습니다. 현재 위치를 알려주세요." }
+      ]
+    },
+    {
+      "id": "replay-health-center-context",
+      "q": "본관 2층이에요",
+      "expect": [45],
+      "history": [
+        { "role": "user", "text": "건강검진센터 어떻게 가요?" },
+        { "role": "assistant", "text": "현재 위치를 알려주세요." }
+      ]
+    },
+    {
+      "id": "replay-disabled-health-screening",
+      "q": "이대목동병원에서 장애인 환자도 건강검진을 받을 수 있나요?",
+      "expect": [51]
+    },
+    {
+      "id": "replay-restaurant",
+      "q": "식당이 있나요?",
+      "expect": [57]
+    },
+    {
+      "id": "replay-reservation-preparation-variant",
+      "q": "예약 했는데 뭘 준비해가면 돼?",
+      "expect": [46]
     }
   ],
   "policy": [
@@ -567,6 +811,11 @@
     {
       "id": "out-010",
       "q": "의사 선생님 실력 어떤가요?",
+      "expect": "refuse"
+    },
+    {
+      "id": "out-011",
+      "q": "택시는 어디서 타?",
       "expect": "refuse"
     }
   ]

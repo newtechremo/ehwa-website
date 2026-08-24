@@ -17,18 +17,31 @@ const db = createClient(url, key, { auth: { persistSession: false, autoRefreshTo
 const from = new Date(`${day}T00:00:00+09:00`)
 const to = new Date(from.getTime() + 86_400_000)
 
-const [usageResult, logsResult, eventsResult] = await Promise.all([
-  db.from("chatbot_usage").select("ai_calls").eq("day", day).eq("env", namespace).maybeSingle(),
-  db.from("chatbot_logs").select("session_id,kind,fallback_reason,provider,latency_ms,tokens_in,tokens_out,tokens_cached,retrieval_method,model_attempts,provider_error_code,created_at")
-    .eq("env", namespace).gte("created_at", from.toISOString()).lt("created_at", to.toISOString()).limit(5000),
-  db.from("chatbot_usage_events").select("operation,outcome,delta").eq("day", day).eq("env", namespace).limit(5000),
-])
-if (usageResult.error || logsResult.error || eventsResult.error) {
-  throw new Error(usageResult.error?.message || logsResult.error?.message || eventsResult.error?.message)
+type LogRow = {
+  session_id: string | null; kind: string; fallback_reason: string | null; provider: string | null
+  latency_ms: number | null; tokens_in: number | null; tokens_out: number | null; tokens_cached: number | null
+  retrieval_method: string | null; model_attempts: number | null; provider_error_code: string | null; created_at: string
+}
+const logs: LogRow[] = []
+for (let offset = 0; ; offset += 1000) {
+  const page = await db.from("chatbot_logs")
+    .select("session_id,kind,fallback_reason,provider,latency_ms,tokens_in,tokens_out,tokens_cached,retrieval_method,model_attempts,provider_error_code,created_at")
+    .eq("env", namespace).gte("created_at", from.toISOString()).lt("created_at", to.toISOString())
+    .order("id").range(offset, offset + 999)
+  if (page.error) throw new Error(page.error.message)
+  logs.push(...((page.data ?? []) as LogRow[]))
+  if ((page.data?.length ?? 0) < 1000) break
 }
 
-const logs = logsResult.data ?? []
-const events = eventsResult.data ?? []
+const [usageResult, allowedResult] = await Promise.all([
+  db.from("chatbot_usage").select("ai_calls").eq("day", day).eq("env", namespace).maybeSingle(),
+  db.from("chatbot_usage_events").select("id", { count: "exact", head: true })
+    .eq("day", day).eq("env", namespace).eq("outcome", "allowed"),
+])
+if (usageResult.error || allowedResult.error) {
+  throw new Error(usageResult.error?.message || allowedResult.error?.message)
+}
+
 const used = Number(usageResult.data?.ai_calls ?? 0)
 const count = (values: string[]) => Object.fromEntries([...new Set(values)].sort().map((value) => [value, values.filter((item) => item === value).length]))
 const source = (row: typeof logs[number]) => row.kind === "ai_answer"
@@ -45,7 +58,7 @@ const sum = (field: "tokens_in" | "tokens_out" | "tokens_cached" | "model_attemp
 const tokensIn = sum("tokens_in")
 const tokensCached = sum("tokens_cached")
 const modelAttempts = sum("model_attempts")
-const allowedEvents = events.filter((event) => event.outcome === "allowed").reduce((total, event) => total + Number(event.delta), 0)
+const allowedEvents = allowedResult.count ?? 0
 const sessions = new Map<string, number>()
 for (const row of logs) {
   const prefix = String(row.session_id).split("-").slice(0, 2).join("-")

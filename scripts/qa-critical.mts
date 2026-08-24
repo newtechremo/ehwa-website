@@ -23,6 +23,10 @@ type CriticalCase = AnswerContract & {
 const suite = JSON.parse(readFileSync("tests/chatbot-critical-answers.json", "utf8")) as {
   cases: CriticalCase[]
 }
+const qaSet = JSON.parse(readFileSync("tests/qa-set.json", "utf8")) as {
+  kb: Array<{ id: string; history?: Array<{ role: "user" | "assistant"; text: string }> }>
+}
+const histories = new Map(qaSet.kb.map((item) => [item.id, item.history]))
 
 const requiredOperations = suite.cases.reduce((sum, testCase) => sum + testCase.repeat, 0) * 2
 const health = await fetch(`${BASE}/api/chatbot/health`, {
@@ -46,7 +50,11 @@ for (const testCase of suite.cases) {
       const raw = await fetch(`${BASE}/api/chatbot/ask`, {
         method: "POST",
         headers: requestHeaders,
-        body: JSON.stringify({ question: testCase.question, sessionId: `qa-critical-${testCase.id}-${attempt}` }),
+        body: JSON.stringify({
+          question: testCase.question,
+          sessionId: `qa-critical-${testCase.id}-${attempt}`,
+          history: histories.get(testCase.id),
+        }),
         signal: AbortSignal.timeout(90_000),
       })
       response = await raw.json().catch(() => ({}))

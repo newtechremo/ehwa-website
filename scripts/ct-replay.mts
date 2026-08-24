@@ -51,6 +51,7 @@ if (!Array.isArray(manifest.states) || manifest.states.join(",") !== STATES.join
 const chats = JSON.parse(readFileSync(`${EXPORT}/user-chats.json`, "utf8"))
 const msgs = JSON.parse(readFileSync(`${EXPORT}/messages.json`, "utf8"))
 const retryMode = process.argv.includes("--retry")
+const retryFallback = process.argv.includes("--retry-fallback")
 const prev: Row[] = retryMode && existsSync(OUT) ? JSON.parse(readFileSync(OUT, "utf8")) : []
 const prevMap = new Map(prev.map((r) => [`${r.chat}|${r.at}`, r]))
 
@@ -76,7 +77,7 @@ for (const c of chats) {
     const key = `${c.id}|${m.createdAt}`
     const cached = prevMap.get(key)
     let row: Row
-    if (retryMode && cached && cached.our_reason !== "model_error" &&
+    if (retryMode && cached && !(retryFallback && cached.our_source === "fallback") && cached.our_reason !== "model_error" &&
         cached.our_source !== "error" && cached.our_source !== "rate_limited") {
       row = cached // 이미 유효한 결과는 재호출하지 않는다
     } else {

@@ -145,19 +145,22 @@ const { data: documentRows, error: documentError } = await db.from("kb_documents
 if (documentError || !documentRows) throw new Error(`문서 ID 조회 실패: ${documentError?.message}`)
 const documentIds = new Map(documentRows.map((row) => [row.doc_key, row.id as number]))
 
-const desired = docs.flatMap((doc) => splitSections(doc.answer).map((section, chunk_index) => {
+const desired = docs.flatMap((doc) => {
   const document_id = documentIds.get(doc.doc_key)
   if (!document_id) throw new Error(`문서 ID 없음: ${doc.doc_key}`)
-  const content = `${doc.topic}\n${section}`
-  const embeddingInput = `${doc.topic}\n${doc.questions.join("\n")}\n${section}`
-  return {
+  const searchContent = doc.short_answer ?? doc.answer.slice(0, 1800)
+  const sections = [
+    { content: searchContent, embeddingInput: `${doc.topic}\n${doc.questions.join("\n")}\n${searchContent}` },
+    ...splitSections(doc.answer).map((section) => ({ content: section, embeddingInput: `${doc.topic}\n${section}` })),
+  ]
+  return sections.map(({ content: section, embeddingInput }, chunk_index) => ({
     document_id,
     chunk_index,
-    content,
+    content: `${doc.topic}\n${section}`,
     content_hash: createHash("sha256").update(embeddingInput).digest("hex"),
     embeddingInput,
-  }
-}))
+  }))
+})
 
 const { data: existingRows, error: existingError } = await db
   .from("kb_chunks")

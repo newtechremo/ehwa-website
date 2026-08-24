@@ -1,5 +1,7 @@
 import assert from "node:assert/strict"
-import { paginate } from "./ct-export.mts"
+import { BUTTON_LABELS, paginate } from "./ct-export.mts"
+
+for (const label of ["카카오톡", "메일", "병원방문"]) assert.ok(BUTTON_LABELS.has(label), label)
 
 let page = 0
 const fetcher = (async () => {

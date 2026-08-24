@@ -8,11 +8,11 @@ import {
   getActions,
 } from "@/lib/chatbot/content"
 import { routeFreeText } from "@/lib/chatbot/engine"
-import { KB_DIRECT_THRESHOLD, loadKb, rankKb } from "@/lib/chatbot/kb"
+import { KB_DIRECT_THRESHOLD, loadKb, rankKb, selectLocationAnswer } from "@/lib/chatbot/kb"
 import { logChat } from "@/lib/chatbot/log"
 import { providerErrorCode, resolveModel } from "@/lib/chatbot/model"
 import { checkRateLimit, clientKey, consumeDailyBudget } from "@/lib/chatbot/ratelimit"
-import { retrieveContext } from "@/lib/chatbot/retrieval"
+import { buildContext, buildGenerationQuestion, buildRetrievalQuery, retrieveContext } from "@/lib/chatbot/retrieval"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -63,6 +63,7 @@ export async function POST(request: Request) {
   let retrievalMethod = "none"
   let embeddingAttempts = 0
   let generationAttempts = 0
+  let fallbackDocIds: string[] = []
   let embeddingErrorCode: string | undefined = undefined
   let generationErrorCode: string | undefined
   let question = ""
@@ -110,6 +111,8 @@ export async function POST(request: Request) {
       userInput: question,
       answer,
       fallbackReason: reason,
+      refId: fallbackDocIds[0],
+      sourceDocIds: fallbackDocIds,
       latencyMs: Date.now() - startedAt,
       ...trace(),
     }))
@@ -149,12 +152,50 @@ export async function POST(request: Request) {
 
   // ③ KB 직답
   const docs = await loadKb()
+  const retrievalQuery = buildRetrievalQuery(question, history)
+  const lastPrompt = history.findLast((turn) => turn.role === "assistant")?.text ?? ""
+  const isMapFollowUp = history.length > 0 && (
+    /^(?:응+|네+).*(?:지도)/.test(question.trim()) ||
+    (/^(?:응+|네+)(?:요)?[!,.?]*$/.test(question.trim()) && /(지도|안내도|preview\.do)/.test(lastPrompt))
+  )
+  const isMapRequest = isMapFollowUp || /^(?:혹시\s*)?지도(?:가|는)?\s*(?:있|보여|알려|필요)|지도.*(?:링크|주세요|줘|확인)/.test(question.trim())
+  const locationDoc = docs.find((doc) => doc.seq === 45)
+  const facilityLocationDocs = [locationDoc, docs.find((doc) => doc.seq === 43)].filter((doc) => doc !== undefined)
+  const locationInputs = retrievalQuery.split("\n").filter((line) => line !== "본관 별관 연결통로")
+  const hasDestinationHistory = history.some((turn) => turn.role === "user")
+  const isLocationRequest = !/(총\s*몇|몇\s*(?:면|대|개)|접수|약은?|택시)/.test(question) && (
+    /(어디|어딘|위치|어떻게\s*가|가고\s*싶|정문|후문|응급실|엘베|[0-9]+\s*층)/.test(question) ||
+    (hasDestinationHistory && /주차장/.test(question))
+  )
+  const locationMatch = isMapRequest && locationDoc?.short_answer
+    ? { doc: locationDoc, answer: locationDoc.short_answer }
+    : isLocationRequest
+      ? facilityLocationDocs.map((doc) => ({ doc, answer: selectLocationAnswer(doc, locationInputs) }))
+        .find((match) => match.answer)
+      : undefined
+  if (locationMatch?.answer) {
+    after(() => logChat({
+      sessionId, kind: "ai_answer", userInput: question,
+      answer: locationMatch.answer,
+      refId: locationMatch.doc.doc_key, sourceDocIds: [locationMatch.doc.doc_key],
+      provider: "kb-direct",
+      latencyMs: Date.now() - startedAt,
+      ...trace(),
+    }))
+    return NextResponse.json({
+      source: "kb", answer: locationMatch.answer, actions: null,
+      refId: locationMatch.doc.doc_key, docIds: [locationMatch.doc.doc_key],
+      ...responseMeta(),
+    })
+  }
   const hits = rankKb(question, docs, 5)
   const best = hits[0]
 
   // 직답은 예상질문과 직접 닮은 경우(qScore)만. 종합 점수는 커버리지 가산 때문에
   // 일반어 질의("진료 예약", "신청")에서 엉뚱한 문서를 임계 위로 밀어올렸다(실측).
-  if (best && best.qScore >= KB_DIRECT_THRESHOLD) {
+  // 문서 45는 여러 진료과를 한 문서에 담아 공통 짧은 답변만으로 특정 과 위치를 답할 수 없다.
+  const needsLocationDetail = best?.doc.seq === 45 && !/(지도|채혈실)/.test(question)
+  if (best && best.qScore >= KB_DIRECT_THRESHOLD && !needsLocationDetail) {
     const answer = best.doc.short_answer ?? best.doc.answer
     after(() => logChat({
       sessionId, kind: "ai_answer", userInput: question,
@@ -187,14 +228,22 @@ export async function POST(request: Request) {
     )
   }
 
-  const retrieved = await retrieveContext(question, sessionId, docs)
+  const retrieved = await retrieveContext(retrievalQuery, sessionId, docs)
+  fallbackDocIds = retrieved.docIds
   retrievalMethod = retrieved.method
   embeddingAttempts = retrieved.embeddingAttempts
   embeddingErrorCode = retrieved.embeddingErrorCode
   if (retrieved.status === "budget_exhausted") return fallback("daily_limit")
   if (retrieved.status === "budget_unavailable") return fallback("budget_unavailable")
   if (!retrieved.context) return fallback("unanswerable")
-  const context = retrieved.context
+  const destinationQuestion = retrievalQuery.split("\n")[0]
+  const destinationDocId = retrievalQuery.includes("\n") && destinationQuestion
+    ? rankKb(destinationQuestion, docs, 1)[0]?.doc.id
+    : undefined
+  const destinationChunk = retrieved.chunks.find((chunk) => chunk.docId === destinationDocId)
+  const context = retrievalQuery.includes("\n")
+    ? buildContext(destinationChunk ? [destinationChunk] : retrieved.chunks.slice(0, 1), 8_000)
+    : retrieved.context
 
   const budget = await consumeDailyBudget(sessionId, "generation")
   if (budget.status === "exhausted") return fallback("daily_limit")
@@ -210,6 +259,9 @@ export async function POST(request: Request) {
     // 실대화 관측: 이용자가 위치만 말하는 후속 발화("지금 1층이에요")가 잦다.
     "이용자가 자기 위치만 말하면(예: '지금 1층이에요', '본관 앞이에요') 직전 대화의 주제를",
     "그 위치 기준으로 이어서 안내하세요. 직전 답변을 그대로 반복하지 말고 달라지는 부분만 알려주세요.",
+    "현재 위치 표현을 새 목적지 질문으로 바꾸지 말고, 직전 사용자가 요청한 목적지를 유지하세요.",
+    "이용자가 '엘베 위주로', '엘베요'처럼 이동 수단만 말해도 직전 목적지와 현재 위치를 함께 이어서",
+    "해당 이동 수단 기준의 동선을 안내하세요.",
     "",
     "절대 규칙:",
     "1. 아래 [참고 문서]에 있는 내용만으로 답하세요. 문서에 없으면 추측하지 마세요.",
@@ -219,8 +271,15 @@ export async function POST(request: Request) {
     "   단, 이용자의 낱말이 문서와 달라도 뜻이 같으면 그 문서로 답하세요.",
     "   (예: '교통/차편 지원' ≈ 이동·동행 지원, '통역' ≈ 수어·의사소통 지원)",
     "   이때 문서에 적힌 범위 제한(예: 병원 건물 내부 한정)도 함께 안내하세요.",
+    "   문서에 명시된 연결통로·엘리베이터 경로는 반대 방향 이동에도 적용할 수 있지만,",
+    "   반대 방향의 구체적인 랜드마크나 사실을 새로 만들지는 마세요.",
+    "   별관 A 연결통로(인공신장실 쪽)와 별관 B 연결통로(정신건강의학과 쪽)를 혼동하지 마세요.",
+    "   연결통로로 목적지 층에 도착했다면 문서 근거 없이 다른 층으로 다시 이동시키지 마세요.",
+    "   위치 후속 질문은 문서에 목적지 위치나 공식 지도 링크가 있으면 UNANSWERABLE로 전부 거절하지 말고,",
+    "   확인된 구간과 지도 링크만 안내하세요. 확인되지 않은 중간 구간은 추가하지 마세요.",
     "2. 의학적 진단·처방·치료 판단은 절대 하지 마세요.",
     "3. 전화번호·운영시간·주소·비용은 문서에 적힌 값을 그대로 쓰고 절대 지어내지 마세요.",
+    "   층·호수와 왼쪽/오른쪽 같은 방향도 문서 값을 바꾸지 마세요.",
     "   문서가 제공 여부를 문의·확인하라고만 하면, 제공 가능하다고 확정해서 말하지 마세요.",
     "4. 참고 문서로 답할 수 없으면 사과나 설명 없이 정확히 `UNANSWERABLE` 한 단어만 출력하세요.",
     "   '정보가 없습니다' 같은 문장을 직접 쓰지 마세요. 안내는 시스템이 대신합니다.",
@@ -244,7 +303,7 @@ export async function POST(request: Request) {
       system,
       messages: [
         ...history.map((t) => ({ role: t.role, content: t.text }) as const),
-        { role: "user" as const, content: question },
+        { role: "user" as const, content: buildGenerationQuestion(question, history, retrievalQuery) },
       ],
       maxOutputTokens: MAX_OUTPUT_TOKENS,
       maxRetries: 0,
