@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js"
+import { usageNamespace } from "./runtime"
 import type { LogKind } from "./types"
 
 /**
@@ -56,7 +57,7 @@ export async function logChat(entry: ChatLogEntry): Promise<void> {
   try {
     const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
     await db.from("chatbot_logs").insert({
-      env: process.env.VERCEL_ENV ?? "development",
+      env: usageNamespace(),
       session_id: entry.sessionId.slice(0, 64) || "unknown",
       kind: entry.kind,
       user_input: entry.userInput ? maskPII(entry.userInput.slice(0, MAX_INPUT)) : null,

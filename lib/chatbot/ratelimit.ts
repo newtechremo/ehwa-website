@@ -1,4 +1,6 @@
 import { createClient } from "@supabase/supabase-js"
+import { createHash, randomUUID } from "node:crypto"
+import { dayInSeoul, usageNamespace } from "./runtime"
 
 /**
  * 챗봇 AI 호출 보호장치.
@@ -49,10 +51,6 @@ function db() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
 }
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
 export function dailyLimit(): number {
   const n = Number(process.env.CHATBOT_DAILY_AI_LIMIT)
   return Number.isFinite(n) && n > 0 ? n : 500
@@ -66,24 +64,39 @@ export function dailyLimit(): number {
  * 넘길 수 있었다. 한도는 과금 방어선이라 경쟁 조건을 허용하면 안 된다.
  * DB 오류 시에는 열어두지 않고 닫는다(AI 만 꺼지고 버튼·FAQ·KB 는 계속 동작).
  */
-export async function consumeDailyBudget(): Promise<{ ok: boolean; used: number; limit: number }> {
+export type BudgetResult =
+  | { status: "allowed"; used: number; limit: number; namespace: string; day: string }
+  | { status: "exhausted"; used: number; limit: number; namespace: string; day: string }
+  | { status: "unavailable"; used: 0; limit: number; namespace: string; day: string }
+
+export async function consumeDailyBudget(
+  sessionId: string,
+  operation: "embedding" | "generation",
+): Promise<BudgetResult> {
   const limit = dailyLimit()
+  const namespace = usageNamespace()
+  const day = dayInSeoul()
   const client = db()
-  if (!client) return { ok: false, used: 0, limit }
+  if (!client) return { status: "unavailable", used: 0, limit, namespace, day }
 
   const { data, error } = await client
-    .rpc("consume_chatbot_budget", {
-      p_day: today(),
-      p_env: process.env.VERCEL_ENV ?? "development",
+    .rpc("consume_chatbot_budget_v2", {
+      p_day: day,
+      p_env: namespace,
       p_limit: limit,
+      p_event_id: randomUUID(),
+      p_session_hash: createHash("sha256").update(sessionId).digest("hex").slice(0, 16),
+      p_operation: operation,
     })
     .single<{ used: number; allowed: boolean }>()
 
   if (error || !data) {
     console.error("consumeDailyBudget rpc 실패:", error?.message)
-    return { ok: false, used: 0, limit }
+    return { status: "unavailable", used: 0, limit, namespace, day }
   }
-  return { ok: data.allowed, used: data.used, limit }
+  return data.allowed
+    ? { status: "allowed", used: data.used, limit, namespace, day }
+    : { status: "exhausted", used: data.used, limit, namespace, day }
 }
 
 export function clientKey(request: Request, sessionId: string): string {

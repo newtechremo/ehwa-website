@@ -11,6 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 npm run dev      # Start dev server (port 3112, hostname 0.0.0.0)
+npm run dev:qa   # QA 전용 namespace 서버 (port 3113)
 npm run build    # Production build
 npm run start    # Production server (port 3112)
 npm run lint     # ESLint (현재 의존성/Flat Config 미설정, 최신 실행 계획 Task 3에서 복구)
@@ -18,6 +19,9 @@ npx tsc --noEmit # Next build가 건너뛰는 TypeScript 독립 검사
 npm run test:chatbot # 정책·FAQ 라우팅 회귀
 npm run kb:eval      # 로컬 Supabase KB 검색 평가
 npm run qa           # dev 서버 대상 현재 qa-set 전체 API QA (문항 수 하드코딩 금지)
+npm run qa:critical  # 핵심 답변 전체 계약을 반복 검증 (자동 재시도 없음)
+npm run test:runtime # KST 날짜와 usage namespace 검증
+npm run test:budget  # 로컬 DB 예산 경계·감사 이벤트 검증
 npm run db:start     # 로컬 Supabase 시작
 npm run db:reset     # 로컬 DB 마이그레이션 재적용
 ```
@@ -66,6 +70,9 @@ app/
 - Improvement order and 500-call attribution: `docs/자체챗봇_개선실행방안_및_AI한도_소진원인분석_20260824.md`
 - Latest status/release plan: `docs/superpowers/plans/2026-08-23-channeltalk-replacement-release.md`
 - Flow: policy/review block → FAQ → KB direct → grounded LLM → phone/Kakao fallback
+- AI 호출량은 `CHATBOT_USAGE_NAMESPACE`로 분리한다. 로컬 사람은 `development-human`,
+  자동 QA는 `qa-local`, Preview는 `preview`, Production은 `production`을 사용한다.
+- 일일 한도는 한국 시간 자정 기준이며 embedding과 generation 실제 제공자 호출을 각각 1회로 센다.
 - `NEXT_PUBLIC_CHATBOT_ENABLED=true`: render `components/chat/ChatWidget.tsx`; otherwise load ChannelTalk
 - Production remains on ChannelTalk until QA, privacy, migration, accessibility, and history-export gates pass
 - Do not treat `tests/qa-result.json`'s old 76/77 as release approval; its FAQ scoring must be fixed first

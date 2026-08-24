@@ -80,7 +80,7 @@ export async function POST(request: Request) {
    * 로그 4행). after() 는 응답 완료 후에도 콜백 완료를 플랫폼이 보장한다.
    */
   // "몰라서 거절"과 "일시적으로 AI 를 못 써서 강등"은 이용자에게 다른 문구로 보인다.
-  const TEMPORARY_REASONS = new Set(["daily_limit", "model_error", "ai_unavailable"])
+  const TEMPORARY_REASONS = new Set(["daily_limit", "budget_unavailable", "model_error", "ai_unavailable"])
   const fallback = (reason: string, detail?: string) => {
     const answer = TEMPORARY_REASONS.has(reason) ? FALLBACK_ANSWER_TEMPORARY : FALLBACK_ANSWER
     after(() => logChat({
@@ -159,8 +159,9 @@ export async function POST(request: Request) {
     )
   }
 
-  const budget = await consumeDailyBudget()
-  if (!budget.ok) return fallback("daily_limit")
+  const budget = await consumeDailyBudget(sessionId, "generation")
+  if (budget.status === "exhausted") return fallback("daily_limit")
+  if (budget.status === "unavailable") return fallback("budget_unavailable")
 
   // KB 전문을 한 번에 넣는다.
   //
