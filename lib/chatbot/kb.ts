@@ -215,6 +215,15 @@ export function rankKb(input: string, docs: KbDoc[], limit = 5): KbHit[] {
  *  - 따라서 이 구간은 직답하지 않고 LLM 판단에 넘긴다. LLM이 없으면 담당자 연결로
  *    떨어진다 — 틀린 답을 내보내는 것보다 안전하다.
  */
-export const KB_DIRECT_THRESHOLD = 0.62
+/**
+ * KB 직답 임계값.
+ *
+ * 0.62 에서 0.66 으로 인상 (2026-08-24 채널톡 실대화 재생):
+ * "병원에 도착해서 뭘 해야해?" 가 문서 19(외부 이동)의 예상질문
+ * "병원 도착해서만 도와주는 거야?" 와 표면 유사로 0.627 을 받아 엉뚱한 원문이
+ * 그대로 나갔다. 골든 297문항 중 0.62~0.66 구간은 0건이라 직답 커버리지 손실 없이
+ * 이런 표면 유사 오답만 LLM(전체 문서 대조) 쪽으로 넘어간다.
+ */
+export const KB_DIRECT_THRESHOLD = 0.66
 /** 이 점수 미만이면 LLM에게 넘길 후보로도 쓰지 않는다 */
 export const KB_CANDIDATE_THRESHOLD = 0.18

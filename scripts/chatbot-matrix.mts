@@ -54,6 +54,11 @@ const CASES: Case[] = [
   { input: "진단서 발급받으려면 어디로 가요?", expect: "fallback", note: "센터 위치 FAQ 오분류 금지 — KB 54" },
   { input: "보험사에 낼 서류 떼는 것도 도와주세요", expect: "fallback", note: "일반 행정 FAQ 오분류 금지 — KB 29" },
   { input: "어디까지 도와주시는 거예요?", expect: "fallback", note: "KB 6/20 지원범위" },
+  // 채널톡 실대화 재생(2026-08-24, Open API 이력 15건)에서 발견된 오답 고정
+  { input: "무료인가요", expect: "fallback", note: "주차 FAQ(faq-36) 가로채기 금지 — KB 16 비용" },
+  { input: "어떻게 이용할 수 있어요?", expect: "fallback", note: "당일이용 FAQ(faq-04) 가로채기 금지 — KB 3/6" },
+  { input: "병원에 도착해서 뭘 해야해?", expect: "fallback", note: "KB직답 19(외부이동) 오답 금지 — KB 47 진료절차" },
+  { input: "서비스 이용하면 주차비 무료인가요?", expect: "faq_hit", expectRef: "faq-36", note: "정확 질문은 그대로 FAQ" },
   // Fallback (KB에 없음 → 지어내면 안 됨)
   { input: "주차장에 전기차 충전기 있나요?", expect: "fallback" },
   { input: "구내식당 메뉴가 뭐예요?", expect: "fallback" },

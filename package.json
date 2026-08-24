@@ -16,7 +16,8 @@
     "build:faq": "tsx scripts/build-faq.mts",
     "kb:ingest": "tsx scripts/ingest-kb.mts",
     "kb:eval": "tsx scripts/kb-eval.mts",
-    "qa": "tsx scripts/qa-run.mts"
+    "qa": "tsx scripts/qa-run.mts",
+    "ct:replay": "tsx scripts/ct-replay.mts"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.49",

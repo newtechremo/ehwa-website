@@ -88,7 +88,7 @@ const FAQ_KEYWORD_BONUS = 0.18
  * 실제 질문 QA에서 한계가 보이면 형태소 분석을 검토한다.
  */
 const FAQ_NOISE =
-  /(어떻게|어디서|어디|무엇|뭐|알려주세요|알려줘|도와주세요|도와줘|되나요|되나|하나요|하나|할까요|인가요|가요|나요|까요)/g
+  /(어떻게|어디서|어디|무엇|뭐|알려주세요|알려줘|도와주세요|도와줘|할수있나요|할수있어요|할수있어|할수있나|되나요|되나|하나요|하나|할까요|인가요|가요|나요|까요)/g
 
 function faqKey(input: string): string {
   return normalize(input).replace(FAQ_NOISE, "")
@@ -116,8 +116,14 @@ export function matchFaq(input: string): { faq: ChatFaq; score: number } | null 
     for (const q of faq.questions) {
       const nq = normalize(q)
       if (!nq) continue
-      // 부분 포함은 강한 신호 (짧은 입력이 대표질문에 포함되는 경우 포함)
-      if (norm.length >= 4 && (norm.includes(nq) || nq.includes(norm))) {
+      // 부분 포함 규칙 (2026-08-24 채널톡 실대화 재생에서 축소):
+      //   변형 ⊂ 입력  → 입력이 더 구체적이므로 안전. 그대로 강한 신호(0.9).
+      //   입력 ⊂ 변형  → 일반 질문이 더 구체적인 FAQ 로 끌려간다.
+      //     실측: "무료인가요" ⊂ "서비스 이용하면 주차비 무료인가요?" → 비용 질문에 주차 안내.
+      //     변형이 입력보다 4자 이내로만 길 때(사실상 같은 문장)만 인정한다.
+      if (norm.length >= 4 && norm.includes(nq)) {
+        score = Math.max(score, 0.9)
+      } else if (norm.length >= 4 && nq.includes(norm) && nq.length <= norm.length + 4) {
         score = Math.max(score, 0.9)
       }
       // 유사도는 의문형 잡음을 뺀 내용어끼리 비교한다
