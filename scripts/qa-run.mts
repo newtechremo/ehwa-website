@@ -1,94 +1,124 @@
-/**
- * 채널톡 대체 검증 — 자동 채점.
- *
- * 정답은 KB 원본 문서 번호(tests/qa-set.json)이며 시스템 출력이 아니다.
- * 실행: npm run qa   (로컬 dev 서버가 떠 있어야 한다)
- */
-import { readFileSync, writeFileSync } from "fs"
+import "./load-env.mts"
+import { createHash } from "node:crypto"
+import { execFileSync } from "node:child_process"
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { dirname } from "node:path"
+import { evaluateAnswer, type AnswerContract } from "../lib/chatbot/answer-contract"
 
-const BASE = process.env.QA_BASE ?? "http://localhost:3112"
-const set = JSON.parse(readFileSync("tests/qa-set.json", "utf8"))
+const BASE = process.env.QA_BASE ?? "http://localhost:3113"
+const EXPECT_NAMESPACE = process.env.QA_EXPECT_NAMESPACE ?? "qa-local"
+const OUTPUT = "docs/chatbot-assets/channeltalk-export/qa-result.json"
+const setRaw = readFileSync("tests/qa-set.json", "utf8")
+const set = JSON.parse(setRaw)
+const critical = JSON.parse(readFileSync("tests/chatbot-critical-answers.json", "utf8")) as {
+  cases: Array<AnswerContract & { id: string }>
+}
+const contracts = new Map(critical.cases.map((testCase) => [testCase.id, testCase]))
+const questionCount = set.kb.length + set.policy.length + set.outOfScope.length
+const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+const bypassHeader = bypass ? { "x-vercel-protection-bypass": bypass } : {}
 
-type Res = { q: string; expect: unknown; source: string; refId: string; docs: number[]; reason: string; answer: string; pass: boolean }
+const healthResponse = await fetch(`${BASE}/api/chatbot/health`, {
+  headers: { Authorization: `Bearer ${process.env.CRON_SECRET ?? ""}`, ...bypassHeader },
+  signal: AbortSignal.timeout(15_000),
+})
+const health = await healthResponse.json().catch(() => ({}))
+if (!healthResponse.ok || health.namespace !== EXPECT_NAMESPACE || Number(health.remaining) < questionCount * 2) {
+  throw new Error(`full QA preflight failed: status=${healthResponse.status} namespace=${health.namespace ?? "?"} remaining=${health.remaining ?? "?"}`)
+}
+if (health.kbCount !== 59 || !health.modelConfigured || !health.embeddingConfigured) {
+  throw new Error(`full QA preflight incomplete: kb=${health.kbCount ?? "?"} model=${Boolean(health.modelConfigured)} embedding=${Boolean(health.embeddingConfigured)}`)
+}
 
-/** FAQ 업로드본의 faq-NN 번호는 KB 문서 번호와 1:1 로 대응한다 (faq-35 = KB 35 노쇼) */
+type Item = { id: string; q: string; expect: number[] | string }
+type Result = {
+  id: string
+  q: string
+  expect: number[] | string
+  source: string
+  refId: string
+  docs: number[]
+  reason: string
+  answer: string
+  evaluation: ReturnType<typeof evaluateAnswer> | null
+  usage: unknown
+  diagnostics: unknown
+  latencyMs: number
+  pass: boolean
+}
+
+const seqOf = (key: string) => Number(key.match(/^(\d+)_/)?.[1] ?? -1)
 const faqSeq = (refId: unknown) => Number(String(refId ?? "").match(/^faq-(\d+)$/)?.[1] ?? -1)
+const results: Result[] = []
 
-const seqOf = (k: string) => Number(String(k).match(/^(\d+)_/)?.[1] ?? -1)
-
-async function ask(q: string) {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    // 기본 fetch 타임아웃(약 30초)으로는 KB 전문 호출이 간혹 초과된다
-    let d: Record<string, unknown> & { source?: string; docIds?: string[]; refId?: string; reason?: string; answer?: string } = {}
-    try {
-      const r = await fetch(`${BASE}/api/chatbot/ask`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q, sessionId: `qa-${Math.random().toString(36).slice(2)}` }),
-        signal: AbortSignal.timeout(90_000),
-      })
-      d = await r.json().catch(() => ({}))
-    } catch {
-      await sleep(3000)
-      continue
-    }
-    // 무료 티어 일시 오류는 재시도 (판정을 흐리지 않기 위해)
-    if (d?.reason === "model_error") { await sleep(4000); continue }
-    return d
+async function ask(item: Item, kind: "kb" | "policy" | "refuse") {
+  const startedAt = Date.now()
+  let data: Record<string, unknown> = {}
+  let error = ""
+  try {
+    const response = await fetch(`${BASE}/api/chatbot/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...bypassHeader },
+      body: JSON.stringify({ question: item.q, sessionId: `qa-full-${item.id}` }),
+      signal: AbortSignal.timeout(90_000),
+    })
+    data = await response.json().catch(() => ({}))
+    if (!response.ok) error = `HTTP ${response.status}`
+  } catch (caught) {
+    error = caught instanceof Error ? caught.message : String(caught)
   }
-  return { source: "fallback", reason: "model_error" }
-}
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-const results: Res[] = []
-
-type Item = { q: string; expect: number[] }
-
-async function run(items: Item[], kind: "kb" | "policy" | "refuse") {
-  for (const it of items) {
-    const d = await ask(it.q)
-    const docs = (d.docIds ?? []).map(seqOf).filter((n: number) => n > 0)
-    // KB 문항 판정: 정답 문서를 인용했거나, 정답 문서에 대응하는 원본 FAQ(faq-NN)가 답했다.
-    // 이전에는 source=faq 면 무조건 통과시켰고, 그 틈으로 "늦으면"→노쇼 FAQ,
-    // "진단서"→센터위치 FAQ 같은 오답이 11건 중에 숨어 있었다(2026-08-23 발견).
-    let pass = false
-    let note = ""
-    if (kind === "kb") {
-      const cited = docs.some((n: number) => it.expect.includes(n))
-      const matchedFaq = d.source === "faq" && it.expect.includes(faqSeq(d.refId))
-      if (cited || matchedFaq) pass = true
-      else if (d.source === "faq") note = `다른 FAQ 응답(${d.refId})`
-      else if (d.source === "ai") note = `다른 문서 인용(${docs.join(",")})`
-      else note = d.reason ?? d.source
-    } else if (kind === "policy") pass = d.source === "policy"
-    else pass = d.source === "fallback"
-    results.push({ q: it.q, expect: it.expect, source: d.source ?? "?", refId: String(d.refId ?? ""), docs, reason: note || (d.reason ?? ""), answer: (d.answer ?? "").replace(/\n/g, " ").slice(0, 100), pass })
-    await sleep(3000) // 무료 키 RPM 한도 회피: 출처 재시도로 호출이 2회가 될 수 있다
+  const source = String(data.source ?? "")
+  const refId = String(data.refId ?? "")
+  const docs = Array.isArray(data.docIds) ? data.docIds.map((key) => seqOf(String(key))).filter((seq) => seq > 0) : []
+  const answer = String(data.answer ?? "")
+  const contract = contracts.get(item.id)
+  const evaluation = contract ? evaluateAnswer(answer, contract) : null
+  let pass = false
+  if (!error && kind === "kb" && Array.isArray(item.expect)) {
+    pass = docs.some((seq) => item.expect.includes(seq)) || (source === "faq" && item.expect.includes(faqSeq(refId)))
+  } else if (!error && kind === "policy") pass = source === "policy"
+  else if (!error && kind === "refuse") {
+    pass = source === "fallback" && ["unanswerable", "model_refused"].includes(String(data.reason ?? ""))
   }
+  if (evaluation && !evaluation.pass) pass = false
+
+  results.push({
+    id: item.id,
+    q: item.q,
+    expect: item.expect,
+    source,
+    refId,
+    docs,
+    reason: error || String(data.reason ?? ""),
+    answer,
+    evaluation,
+    usage: data.usage ?? null,
+    diagnostics: data.diagnostics ?? null,
+    latencyMs: Date.now() - startedAt,
+    pass,
+  })
+  process.stdout.write(`${pass ? "✓" : "✗"} ${item.id} ${source}${data.reason ? `/${data.reason}` : ""}\n`)
 }
 
-await run(set.kb, "kb")
-await run(set.policy, "policy")
-await run(set.outOfScope, "refuse")
+const startedAt = new Date().toISOString()
+for (const item of set.kb as Item[]) await ask(item, "kb")
+for (const item of set.policy as Item[]) await ask(item, "policy")
+for (const item of set.outOfScope as Item[]) await ask(item, "refuse")
+const finishedAt = new Date().toISOString()
 
-const g = (n: number, m: number) => `${n}/${m} (${Math.round((n / m) * 100)}%)`
-const kb = results.slice(0, set.kb.length)
-const po = results.slice(set.kb.length, set.kb.length + set.policy.length)
-const oo = results.slice(set.kb.length + set.policy.length)
-
-console.log("\n══════ 채점 결과 ══════")
-const kbCited = kb.filter((r) => r.pass && r.source !== "faq")
-const kbFaq = kb.filter((r) => r.pass && r.source === "faq")
-console.log(`  KB 정답 문서 인용   ${g(kbCited.length, kb.length)}`)
-console.log(`  정답 FAQ 응답       ${g(kbFaq.length, kb.length)}`)
-console.log(`  KB 합계             ${g(kb.filter((r) => r.pass).length, kb.length)}`)
-console.log(`  정책 차단           ${g(po.filter((r) => r.pass).length, po.length)}`)
-console.log(`  범위 밖 거절        ${g(oo.filter((r) => r.pass).length, oo.length)}`)
-console.log(`  전체                ${g(results.filter((r) => r.pass).length, results.length)}`)
-
-const fails = results.filter((r) => !r.pass)
-if (fails.length) {
-  console.log("\n── 불합격 ──")
-  for (const f of fails) console.log(`  ✗ "${f.q}"\n      기대=${JSON.stringify(f.expect)} 실제=${f.source}/${f.refId || f.docs.join(",") || f.reason}\n      "${f.answer.slice(0, 70)}"`)
+const meta = {
+  commit: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+  setSha256: createHash("sha256").update(setRaw).digest("hex"),
+  namespace: EXPECT_NAMESPACE,
+  questionCount,
+  resultCount: results.length,
+  startedAt,
+  finishedAt,
 }
-writeFileSync("tests/qa-result.json", JSON.stringify(results, null, 2), "utf8")
-console.log("\n  상세: tests/qa-result.json")
+mkdirSync(dirname(OUTPUT), { recursive: true })
+writeFileSync(OUTPUT, JSON.stringify({ meta, results }, null, 2))
+const passed = results.filter((result) => result.pass).length
+console.log(`full QA: ${passed}/${results.length} PASS`)
+console.log(`result: ${OUTPUT}`)
+if (passed !== results.length) process.exitCode = 1

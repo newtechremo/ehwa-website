@@ -24,7 +24,9 @@
     "build:faq": "tsx scripts/build-faq.mts",
     "kb:ingest": "tsx scripts/ingest-kb.mts",
     "kb:eval": "tsx scripts/kb-eval.mts",
-    "qa": "tsx scripts/qa-run.mts",
+    "qa:offline": "npm run test:answer-contract && npm run test:runtime && npm run test:budget && npm run test:chatbot && npm run kb:eval && npm run retrieval:test",
+    "qa:full": "tsx scripts/qa-run.mts",
+    "qa:result": "tsx scripts/qa-result-check.mts",
     "ct:export": "tsx scripts/ct-export.mts",
     "ct:volume": "tsx scripts/ct-volume.mts",
     "ct:replay": "tsx scripts/ct-replay.mts"

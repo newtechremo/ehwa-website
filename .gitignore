@@ -60,7 +60,7 @@ supabase/.branches/
 # OMC 툴링 세션 상태 (로컬 전용)
 .omc/
 
-# 채널톡 원본 대화 이력 — 환자 개인정보 포함. 로컬에서만 다룬다
+# 채널톡 원본 대화 이력과 live QA 결과 — 환자 개인정보 가능. 로컬에서만 다룬다
 docs/chatbot-assets/channeltalk-export/
 
 # 채널톡 비교용 대용량 원본 영상 — Slack 원본만 보존

@@ -1,9 +1,16 @@
+import "./load-env.mts"
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
 import { evaluateAnswer, type AnswerContract } from "../lib/chatbot/answer-contract"
 
 const BASE = process.env.QA_BASE ?? "http://localhost:3113"
 const OUTPUT = "docs/chatbot-assets/channeltalk-export/qa-critical-result.json"
+const EXPECT_NAMESPACE = process.env.QA_EXPECT_NAMESPACE ?? "qa-local"
+const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+const requestHeaders: Record<string, string> = {
+  "Content-Type": "application/json",
+  ...(bypass ? { "x-vercel-protection-bypass": bypass } : {}),
+}
 
 type CriticalCase = AnswerContract & {
   id: string
@@ -17,6 +24,18 @@ const suite = JSON.parse(readFileSync("tests/chatbot-critical-answers.json", "ut
   cases: CriticalCase[]
 }
 
+const requiredOperations = suite.cases.reduce((sum, testCase) => sum + testCase.repeat, 0) * 2
+const health = await fetch(`${BASE}/api/chatbot/health`, {
+  headers: {
+    Authorization: `Bearer ${process.env.CRON_SECRET ?? ""}`,
+    ...(bypass ? { "x-vercel-protection-bypass": bypass } : {}),
+  },
+  signal: AbortSignal.timeout(15_000),
+}).then(async (response) => ({ ok: response.ok, status: response.status, body: await response.json().catch(() => ({})) }))
+if (!health.ok || health.body.namespace !== EXPECT_NAMESPACE || Number(health.body.remaining) < requiredOperations) {
+  throw new Error(`critical preflight failed: status=${health.status} namespace=${health.body.namespace ?? "?"} remaining=${health.body.remaining ?? "?"}`)
+}
+
 const results = []
 for (const testCase of suite.cases) {
   for (let attempt = 1; attempt <= testCase.repeat; attempt += 1) {
@@ -26,7 +45,7 @@ for (const testCase of suite.cases) {
     try {
       const raw = await fetch(`${BASE}/api/chatbot/ask`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: requestHeaders,
         body: JSON.stringify({ question: testCase.question, sessionId: `qa-critical-${testCase.id}-${attempt}` }),
         signal: AbortSignal.timeout(90_000),
       })
