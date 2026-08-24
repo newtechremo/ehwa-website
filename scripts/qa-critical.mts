@@ -1,0 +1,64 @@
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { dirname } from "node:path"
+import { evaluateAnswer, type AnswerContract } from "../lib/chatbot/answer-contract"
+
+const BASE = process.env.QA_BASE ?? "http://localhost:3113"
+const OUTPUT = "docs/chatbot-assets/channeltalk-export/qa-critical-result.json"
+
+type CriticalCase = AnswerContract & {
+  id: string
+  question: string
+  allowedSources: string[]
+  repeat: number
+}
+
+const suite = JSON.parse(readFileSync("tests/chatbot-critical-answers.json", "utf8")) as {
+  cases: CriticalCase[]
+}
+
+const results = []
+for (const testCase of suite.cases) {
+  for (let attempt = 1; attempt <= testCase.repeat; attempt += 1) {
+    const startedAt = Date.now()
+    let response: Record<string, unknown> = {}
+    let error = ""
+    try {
+      const raw = await fetch(`${BASE}/api/chatbot/ask`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: testCase.question, sessionId: `qa-critical-${testCase.id}-${attempt}` }),
+        signal: AbortSignal.timeout(90_000),
+      })
+      response = await raw.json().catch(() => ({}))
+      if (!raw.ok) error = `HTTP ${raw.status}`
+    } catch (caught) {
+      error = caught instanceof Error ? caught.message : String(caught)
+    }
+
+    const answer = String(response.answer ?? "")
+    const evaluation = evaluateAnswer(answer, testCase)
+    const source = String(response.source ?? "")
+    const pass = !error && testCase.allowedSources.includes(source) && evaluation.pass
+    results.push({
+      id: testCase.id,
+      attempt,
+      question: testCase.question,
+      answer,
+      source,
+      reason: response.reason ?? null,
+      provider: response.provider ?? null,
+      usage: response.usage ?? null,
+      latencyMs: Date.now() - startedAt,
+      evaluation,
+      error: error || null,
+      pass,
+    })
+  }
+}
+
+mkdirSync(dirname(OUTPUT), { recursive: true })
+writeFileSync(OUTPUT, JSON.stringify({ base: BASE, createdAt: new Date().toISOString(), results }, null, 2))
+const passed = results.filter((result) => result.pass).length
+console.log(`critical QA: ${passed}/${results.length} PASS`)
+console.log(`result: ${OUTPUT}`)
+if (passed !== results.length) process.exitCode = 1
