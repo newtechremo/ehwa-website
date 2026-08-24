@@ -1,5 +1,6 @@
 import { NextResponse, after } from "next/server"
 import { generateText } from "ai"
+import { randomUUID } from "node:crypto"
 import {
   FALLBACK_ACTION_IDS,
   FALLBACK_ANSWER,
@@ -9,7 +10,7 @@ import {
 import { routeFreeText } from "@/lib/chatbot/engine"
 import { KB_DIRECT_THRESHOLD, loadKb, rankKb } from "@/lib/chatbot/kb"
 import { logChat } from "@/lib/chatbot/log"
-import { resolveModel } from "@/lib/chatbot/model"
+import { providerErrorCode, resolveModel } from "@/lib/chatbot/model"
 import { checkRateLimit, clientKey, consumeDailyBudget } from "@/lib/chatbot/ratelimit"
 import { retrieveContext } from "@/lib/chatbot/retrieval"
 
@@ -58,6 +59,12 @@ function readHistory(body: unknown): Turn[] {
  */
 export async function POST(request: Request) {
   const startedAt = Date.now()
+  const requestId = randomUUID()
+  let retrievalMethod = "none"
+  let embeddingAttempts = 0
+  let generationAttempts = 0
+  let embeddingErrorCode: string | undefined = undefined
+  let generationErrorCode: string | undefined
   let question = ""
   let sessionId = "unknown"
   let history: Turn[] = []
@@ -67,9 +74,22 @@ export async function POST(request: Request) {
     sessionId = String(body?.sessionId ?? "unknown").slice(0, 64)
     history = readHistory(body)
   } catch {
-    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 })
+    return NextResponse.json({ error: "잘못된 요청입니다.", requestId }, { status: 400 })
   }
-  if (!question) return NextResponse.json({ error: "질문이 비어 있습니다." }, { status: 400 })
+  if (!question) return NextResponse.json({ error: "질문이 비어 있습니다.", requestId }, { status: 400 })
+
+  const trace = () => ({
+    requestId,
+    retrievalMethod,
+    embeddingAttempts,
+    generationAttempts,
+    modelAttempts: embeddingAttempts + generationAttempts,
+    embeddingErrorCode,
+    providerErrorCode: generationErrorCode,
+  })
+  const responseMeta = () => process.env.VERCEL_ENV === "production"
+    ? { requestId }
+    : { requestId, diagnostics: trace() }
 
   /**
    * fallback 응답 생성 + 로깅을 한 곳에 묶는다.
@@ -91,6 +111,7 @@ export async function POST(request: Request) {
       answer,
       fallbackReason: reason,
       latencyMs: Date.now() - startedAt,
+      ...trace(),
     }))
     return NextResponse.json({
       source: "fallback",
@@ -100,6 +121,7 @@ export async function POST(request: Request) {
       actions: getActions(FALLBACK_ACTION_IDS) ?? null,
       refId: null,
       docIds: [],
+      ...responseMeta(),
     })
   }
 
@@ -113,6 +135,7 @@ export async function POST(request: Request) {
       answer: routed.message.text,
       refId: routed.refId,
       latencyMs: Date.now() - startedAt,
+      ...trace(),
     }))
     return NextResponse.json({
       source: routed.message.source,
@@ -120,6 +143,7 @@ export async function POST(request: Request) {
       actions: routed.message.actions ?? null,
       refId: routed.refId ?? null,
       docIds: [],
+      ...responseMeta(),
     })
   }
 
@@ -138,6 +162,7 @@ export async function POST(request: Request) {
       refId: best.doc.doc_key, sourceDocIds: [best.doc.doc_key],
       provider: "kb-direct",
       latencyMs: Date.now() - startedAt,
+      ...trace(),
     }))
     return NextResponse.json({
       source: "kb",
@@ -146,6 +171,7 @@ export async function POST(request: Request) {
       refId: best.doc.doc_key,
       docIds: [best.doc.doc_key],
       score: Number(best.score.toFixed(3)),
+      ...responseMeta(),
     })
   }
 
@@ -156,12 +182,15 @@ export async function POST(request: Request) {
   const rl = checkRateLimit(clientKey(request, sessionId))
   if (!rl.ok) {
     return NextResponse.json(
-      { source: "rate_limited", answer: "질문이 너무 빨라요. 잠시 후 다시 시도해 주세요.", retryAfterSec: rl.retryAfterSec },
+      { source: "rate_limited", answer: "질문이 너무 빨라요. 잠시 후 다시 시도해 주세요.", retryAfterSec: rl.retryAfterSec, ...responseMeta() },
       { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
     )
   }
 
   const retrieved = await retrieveContext(question, sessionId, docs)
+  retrievalMethod = retrieved.method
+  embeddingAttempts = retrieved.embeddingAttempts
+  embeddingErrorCode = retrieved.embeddingErrorCode
   if (retrieved.status === "budget_exhausted") return fallback("daily_limit")
   if (retrieved.status === "budget_unavailable") return fallback("budget_unavailable")
   if (!retrieved.context) return fallback("unanswerable")
@@ -192,10 +221,9 @@ export async function POST(request: Request) {
     "   이때 문서에 적힌 범위 제한(예: 병원 건물 내부 한정)도 함께 안내하세요.",
     "2. 의학적 진단·처방·치료 판단은 절대 하지 마세요.",
     "3. 전화번호·운영시간·주소·비용은 문서에 적힌 값을 그대로 쓰고 절대 지어내지 마세요.",
-    "4. 답변 마지막 줄에 반드시 근거 문서 번호를 `[출처: 12]` 형식으로 표기하세요. 여러 개면 `[출처: 12, 34]`.",
-    "5. 참고 문서로 답할 수 없으면 사과나 설명 없이 정확히 `UNANSWERABLE` 한 단어만 출력하세요.",
+    "4. 참고 문서로 답할 수 없으면 사과나 설명 없이 정확히 `UNANSWERABLE` 한 단어만 출력하세요.",
     "   '정보가 없습니다' 같은 문장을 직접 쓰지 마세요. 안내는 시스템이 대신합니다.",
-    "6. 질문이 편의지원·병원 이용과 무관하면(날씨·요리·투자 등) 역시 `UNANSWERABLE` 만 출력하세요.",
+    "5. 질문이 편의지원·병원 이용과 무관하면(날씨·요리·투자 등) 역시 `UNANSWERABLE` 만 출력하세요.",
     "",
     "[참고 문서]",
     context,
@@ -207,60 +235,32 @@ export async function POST(request: Request) {
     tokensOut?: number | null
     tokensCached?: number | null
   } = {}
-  let retried = false
 
-  const generate = async (nudge?: string) => {
+  try {
+    generationAttempts = 1
     const res = await generateText({
       model: choice.model,
-      system: nudge ? `${system}\n\n${nudge}` : system,
+      system,
       messages: [
         ...history.map((t) => ({ role: t.role, content: t.text }) as const),
         { role: "user" as const, content: question },
       ],
       maxOutputTokens: MAX_OUTPUT_TOKENS,
-      // 안내 챗봇은 창의성이 필요 없다. 다만 0 으로 둬도 Gemini 는 완전히 결정적이지
-      // 않다(실측: 같은 77문항 2회 실행에서 인용 문서 조합이 26건 달랐다). 편차를 줄이는
-      // 효과만 기대하고, 재현성은 채점기가 "정답 문서 중 하나 인용"으로 흡수한다.
+      maxRetries: 0,
       temperature: 0,
     })
     text = (res.text ?? "").trim()
     usage = {
-      tokensIn: (usage.tokensIn ?? 0) + (res.usage?.inputTokens ?? 0),
-      tokensOut: (usage.tokensOut ?? 0) + (res.usage?.outputTokens ?? 0),
-      // 암시적 컨텍스트 캐시 적중분. 이 값이 떨어지면 비용이 조용히 4배가 된다.
-      tokensCached: (usage.tokensCached ?? 0) + (res.usage?.inputTokenDetails?.cacheReadTokens ?? 0),
+      tokensIn: res.usage?.inputTokens ?? 0,
+      tokensOut: res.usage?.outputTokens ?? 0,
+      tokensCached: res.usage?.inputTokenDetails?.cacheReadTokens ?? 0,
     }
+  } catch (error) {
+    generationErrorCode = providerErrorCode(error)
+    console.error("chatbot ask - model error:", generationErrorCode)
+    return fallback("model_error", process.env.VERCEL_ENV === "production" ? undefined : generationErrorCode)
   }
 
-  const extractSeqs = (t: string) => {
-    const seqs = new Set<number>()
-    // 모델이 "출처: 문서 12" 처럼 '문서' 를 끼워 쓰는 변형도 받는다
-    for (const m of t.matchAll(/\[?\s*출처\s*[::]\s*(?:문서\s*)?([0-9,\s]+)\]?/g)) {
-      for (const n of m[1].split(",")) {
-        const v = Number(n.trim())
-        if (Number.isInteger(v)) seqs.add(v)
-      }
-    }
-    return seqs
-  }
-
-  try {
-    await generate()
-    // 모델이 답은 제대로 쓰고 출처 표기만 빼먹는 경우가 있다(실측: 77문항 중 1건꼴).
-    // 그대로 두면 맞는 답이 통째로 담당자 연결로 떨어진다. 한 번만 더 요구한다.
-    // 재시도는 실패 요청에만 발생하므로 평균 비용 영향은 1~2% 수준이다.
-    if (text && !text.includes("UNANSWERABLE") && extractSeqs(text).size === 0) {
-      retried = true
-      await generate("중요: 직전 답변에 근거 문서 번호가 없었습니다. 반드시 마지막 줄에 `[출처: 번호]` 를 적으세요.")
-    }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    console.error("chatbot ask - model error:", msg)
-    // 운영에서는 내부 오류를 노출하지 않고, preview/로컬에서만 진단용으로 실어보낸다
-    return fallback("model_error", process.env.VERCEL_ENV === "production" ? undefined : msg.slice(0, 300))
-  }
-
-  // ④-검증: 근거 문서를 대지 못한 답변은 사용자에게 내보내지 않는다
   if (!text || text.includes("UNANSWERABLE")) return fallback("unanswerable")
 
   // 모델이 UNANSWERABLE 대신 거절 문장을 쓰는 경우가 있다(실측: "정보가 없어
@@ -269,31 +269,18 @@ export async function POST(request: Request) {
   const REFUSAL = /(정보(가|는)?\s*(없|가지고 있지 않))|((답변|안내)(을|를)?\s*(드릴|해 드릴)?\s*수\s*없)|(확인(이|해)?\s*어렵)/
   if (REFUSAL.test(text)) return fallback("model_refused")
 
-  const seqs = extractSeqs(text)
-  const cited = docs.filter((d) => seqs.has(d.seq)).map((d) => d.doc_key)
-  if (cited.length === 0) {
-    // 어떤 표기를 쓰다 탈락했는지 남긴다. 사유의 retry 유무로 재시도 동작도 검증된다.
-    console.error("chatbot ask - no_citation 원문 끝부분:", JSON.stringify(text.slice(-160)))
-    return fallback(retried ? "no_citation_after_retry" : "no_citation")
-  }
-
-  // 모델이 [출처: X] / 출처: [X] / 출처: X 등으로 다양하게 쓰므로 모두 걷어낸다.
-  // 남은 홀괄호까지 정리하지 않으면 말풍선 끝에 "]" 같은 찌꺼기가 보인다(실측).
-  const answer = text
-    .replace(/\[?\s*출처\s*[::][^\]\n]*\]?/g, "")
-    .replace(/^\s*[\]\[)(]\s*$/gm, "")
-    .replace(/[\]\[]\s*$/g, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim()
+  const cited = retrieved.docIds
+  const answer = text.trim()
   if (!answer) return fallback("empty_after_strip")
 
   after(() => logChat({
     sessionId, kind: "ai_answer", userInput: question,
     answer,
     refId: cited[0], sourceDocIds: cited,
-    provider: choice.provider, model: retried ? `${choice.id}+retry` : choice.id,
+    provider: choice.provider, model: choice.id,
     latencyMs: Date.now() - startedAt,
     ...usage,
+    ...trace(),
   }))
   return NextResponse.json({
     source: "ai",
@@ -301,7 +288,10 @@ export async function POST(request: Request) {
     actions: null,
     refId: cited[0],
     docIds: cited,
-    usage: { used: budget.used, limit: budget.limit },
+    ...(process.env.VERCEL_ENV === "production" ? {} : {
+      usage: { used: budget.used, limit: budget.limit, day: budget.day, namespace: budget.namespace },
+    }),
     provider: choice.provider,
+    ...responseMeta(),
   })
 }

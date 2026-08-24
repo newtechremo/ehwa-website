@@ -5,6 +5,7 @@
       "question": "지원되는 교통 서비스는 무엇이 있는가?",
       "allowedSources": ["kb", "ai"],
       "repeat": 3,
+      "expectedAttempts": { "embedding": 0, "generation": 0, "model": 0 },
       "required": [
         { "id": "exam-clinic", "all": ["검사실", "진료실", "이동"] },
         { "id": "walking", "any": ["보행", "부축"] },
@@ -19,6 +20,7 @@
       "question": "검사실·진료실 이동 보조를 받으려면 어떻게 해야하는가?",
       "allowedSources": ["kb", "faq"],
       "repeat": 3,
+      "expectedAttempts": { "embedding": 0, "generation": 0, "model": 0 },
       "required": [
         { "id": "three-days", "all": ["3일", "권장"] },
         { "id": "visit", "all": ["본관", "1층", "접수창구"] },
@@ -35,6 +37,7 @@
       "question": "가정간호 서비스는 어떻게 신청하나요?",
       "allowedSources": ["kb"],
       "repeat": 2,
+      "expectedAttempts": { "embedding": 0, "generation": 0, "model": 0 },
       "required": [
         { "id": "doctor-order", "all": ["주치의", "처방"] },
         { "id": "consult-time", "any": ["외래 진료", "퇴원 전"] },
@@ -47,6 +50,7 @@
       "question": "가정간호 서비스 신청은 어떻게 하나요?",
       "allowedSources": ["kb"],
       "repeat": 2,
+      "expectedAttempts": { "embedding": 0, "generation": 0, "model": 0 },
       "required": [
         { "id": "doctor-order", "all": ["주치의", "처방"] },
         { "id": "office", "exact": ["02-2650-5087"] }

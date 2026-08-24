@@ -3,7 +3,7 @@
  *
  * Open API 로 받은 실제 이용자 대화(docs/chatbot-assets/channeltalk-export/, git 제외)를
  * 자체 챗봇에 같은 순서·같은 맥락으로 재생해 채널톡 실답변과 나란히 기록한다.
- * 맥락 구성은 ChatWidget 과 동일: 직전 4턴, 300자, user + (ai|faq) 봇 답변만.
+ * 맥락 구성은 ChatWidget 과 동일: 직전 4턴, 300자, user + (ai|faq|kb) 봇 답변만.
  *
  * 실행: npm run ct:replay            (전체)
  *       npm run ct:replay -- --retry (직전 결과에서 model_error 였던 항목만 재실행·병합)
@@ -92,9 +92,9 @@ for (const c of chats) {
       await new Promise((r) => setTimeout(r, d.source === "ai" || d.source === "fallback" || d.source === "rate_limited" ? 9000 : 300))
     }
     rows.push(row)
-    // 맥락 갱신 — ChatWidget 과 동일 필터 (user + ai/faq 만, kb 직답·fallback 제외)
+    // 맥락 갱신 — ChatWidget 과 동일 필터 (user + ai/faq/kb, fallback 제외)
     history.push({ role: "user", text: row.q.slice(0, 300) })
-    if (row.our_source === "ai" || row.our_source === "faq") {
+    if (row.our_source === "ai" || row.our_source === "faq" || row.our_source === "kb") {
       history.push({ role: "assistant", text: row.our_answer.slice(0, 300) })
     }
     process.stdout.write(`  [${rows.length}] ${row.our_source.padEnd(9)} ${row.q.slice(0, 30)}\n`)

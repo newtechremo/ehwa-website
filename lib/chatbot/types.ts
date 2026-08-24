@@ -47,7 +47,7 @@ export type ChatPolicy = {
   actionIds?: string[]
 }
 
-export type MessageSource = "welcome" | "node" | "faq" | "policy" | "fallback" | "ai"
+export type MessageSource = "welcome" | "node" | "faq" | "policy" | "fallback" | "ai" | "kb"
 
 export type ChatMessage = {
   id: string

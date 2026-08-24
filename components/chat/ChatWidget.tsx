@@ -168,7 +168,7 @@ export function ChatWidget() {
         // 직전 대화만 보낸다. 길게 보내면 비용·지연이 늘고 오래된 맥락이 답변을 흐린다.
         // 버튼으로 출력된 안내문은 맥락으로 쓰지 않고, 사람이 쓴 질문과 답변만 보낸다.
         const history = messages
-          .filter((m) => m.role === "user" || m.source === "ai" || m.source === "faq")
+          .filter((m) => m.role === "user" || m.source === "ai" || m.source === "faq" || m.source === "kb")
           .slice(-4)
           .map((m) => ({
             role: m.role === "user" ? ("user" as const) : ("assistant" as const),
@@ -194,7 +194,7 @@ export function ChatWidget() {
           id: `b-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           role: "bot",
           text: data?.answer || FALLBACK_TEXT,
-          source: data?.source === "ai" ? "ai" : data?.source === "kb" ? "node" : "fallback",
+          source: data?.source === "ai" ? "ai" : data?.source === "kb" ? "kb" : "fallback",
           actions: data?.actions ?? undefined,
           buttons: BACK_BUTTONS,
         })

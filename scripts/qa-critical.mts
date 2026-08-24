@@ -10,6 +10,7 @@ type CriticalCase = AnswerContract & {
   question: string
   allowedSources: string[]
   repeat: number
+  expectedAttempts: { embedding: number; generation: number; model: number }
 }
 
 const suite = JSON.parse(readFileSync("tests/chatbot-critical-answers.json", "utf8")) as {
@@ -38,7 +39,17 @@ for (const testCase of suite.cases) {
     const answer = String(response.answer ?? "")
     const evaluation = evaluateAnswer(answer, testCase)
     const source = String(response.source ?? "")
-    const pass = !error && testCase.allowedSources.includes(source) && evaluation.pass
+    const diagnostics = (response.diagnostics ?? {}) as Record<string, unknown>
+    const attempts = {
+      embedding: typeof diagnostics.embeddingAttempts === "number" ? diagnostics.embeddingAttempts : null,
+      generation: typeof diagnostics.generationAttempts === "number" ? diagnostics.generationAttempts : null,
+      model: typeof diagnostics.modelAttempts === "number" ? diagnostics.modelAttempts : null,
+    }
+    const expected = source === "ai" ? { embedding: 1, generation: 1, model: 2 } : testCase.expectedAttempts
+    const attemptsPass = attempts.embedding === expected.embedding &&
+      attempts.generation === expected.generation && attempts.model === expected.model &&
+      attempts.model === (attempts.embedding ?? -1) + (attempts.generation ?? -1)
+    const pass = !error && testCase.allowedSources.includes(source) && evaluation.pass && attemptsPass
     results.push({
       id: testCase.id,
       attempt,
@@ -50,6 +61,8 @@ for (const testCase of suite.cases) {
       usage: response.usage ?? null,
       latencyMs: Date.now() - startedAt,
       evaluation,
+      attempts,
+      attemptsPass,
       error: error || null,
       pass,
     })

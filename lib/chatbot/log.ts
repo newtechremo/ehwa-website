@@ -29,6 +29,7 @@ export function maskPII(text: string): string {
 }
 
 export type ChatLogEntry = {
+  requestId?: string | null
   sessionId: string
   kind: LogKind
   userInput?: string
@@ -44,6 +45,12 @@ export type ChatLogEntry = {
   tokensIn?: number | null
   tokensOut?: number | null
   tokensCached?: number | null
+  retrievalMethod?: string | null
+  embeddingAttempts?: number | null
+  generationAttempts?: number | null
+  modelAttempts?: number | null
+  embeddingErrorCode?: string | null
+  providerErrorCode?: string | null
 }
 
 function int(v: number | null | undefined): number | null {
@@ -57,6 +64,7 @@ export async function logChat(entry: ChatLogEntry): Promise<void> {
   try {
     const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
     await db.from("chatbot_logs").insert({
+      request_id: entry.requestId ?? null,
       env: usageNamespace(),
       session_id: entry.sessionId.slice(0, 64) || "unknown",
       kind: entry.kind,
@@ -72,6 +80,12 @@ export async function logChat(entry: ChatLogEntry): Promise<void> {
       tokens_in: int(entry.tokensIn),
       tokens_out: int(entry.tokensOut),
       tokens_cached: int(entry.tokensCached),
+      retrieval_method: entry.retrievalMethod ?? null,
+      embedding_attempts: int(entry.embeddingAttempts),
+      generation_attempts: int(entry.generationAttempts),
+      model_attempts: int(entry.modelAttempts),
+      embedding_error_code: entry.embeddingErrorCode?.slice(0, 64) ?? null,
+      provider_error_code: entry.providerErrorCode?.slice(0, 64) ?? null,
     })
   } catch {
     /* 로그 실패는 무시 */
