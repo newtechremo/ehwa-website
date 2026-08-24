@@ -34,6 +34,8 @@ const CASES: Case[] = [
   { input: "지금 병원 가는데 바로 신청돼요?", expect: "faq_hit", expectRef: "faq-04" },
   { input: "당일 접수 받아주나요?", expect: "faq_hit", expectRef: "faq-04" },
   { input: "어떻게 신청하나요?", expect: "faq_hit", expectRef: "faq-03" },
+  { input: "가정간호 서비스는 어떻게 신청하나요?", expect: "fallback", note: "일반 편의지원 FAQ 03 가로채기 금지" },
+  { input: "가정간호 서비스 신청은 어떻게 하나요?", expect: "fallback", note: "표현 순서가 달라도 FAQ 03 가로채기 금지" },
   { input: "운영시간이 어떻게 되나요?", expect: "faq_hit", expectRef: "faq-13" },
   // 서버(KB 직답/LLM)로 넘기는 경우.
   // 2026-08-23 수기 FAQ 8건 제거 + 의문형 잡음 제거 이전에는 FAQ가 답했으나,

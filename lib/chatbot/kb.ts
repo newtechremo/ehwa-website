@@ -16,6 +16,7 @@ export type KbDoc = {
   category: string
   topic: string
   questions: string[]
+  short_answer: string | null
   answer: string
 }
 
@@ -32,7 +33,7 @@ export async function loadKb(): Promise<KbDoc[]> {
   const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
   const { data, error } = await db
     .from("kb_documents")
-    .select("id, doc_key, seq, category, topic, questions, answer")
+    .select("id, doc_key, seq, category, topic, questions, short_answer, answer")
     .eq("published", true)
     .order("seq")
 
@@ -205,7 +206,8 @@ export function rankKb(input: string, docs: KbDoc[], limit = 5): KbHit[] {
       // "무료인가요" ⊂ "서비스 이용하면 주차비 무료인가요?" 로 비용 질문이
       // 주차 문서 직답을 받았다. 반대 방향은 사실상 같은 문장일 때만 인정.
       let sc = similarity(qKey, contentKey(q))
-      if (norm.length >= 5 && (norm.includes(nq) || (nq.includes(norm) && nq.length <= norm.length + 4))) {
+      const nearSame = Math.abs(norm.length - nq.length) <= 4
+      if (norm.length >= 5 && nearSame && (norm.includes(nq) || nq.includes(norm))) {
         sc = Math.max(sc, 0.88)
       }
       if (sc > best) {

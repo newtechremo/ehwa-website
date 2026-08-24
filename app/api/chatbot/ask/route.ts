@@ -130,16 +130,17 @@ export async function POST(request: Request) {
   // 직답은 예상질문과 직접 닮은 경우(qScore)만. 종합 점수는 커버리지 가산 때문에
   // 일반어 질의("진료 예약", "신청")에서 엉뚱한 문서를 임계 위로 밀어올렸다(실측).
   if (best && best.qScore >= KB_DIRECT_THRESHOLD) {
+    const answer = best.doc.short_answer ?? best.doc.answer
     after(() => logChat({
       sessionId, kind: "ai_answer", userInput: question,
-      answer: best.doc.answer,
+      answer,
       refId: best.doc.doc_key, sourceDocIds: [best.doc.doc_key],
       provider: "kb-direct",
       latencyMs: Date.now() - startedAt,
     }))
     return NextResponse.json({
       source: "kb",
-      answer: best.doc.answer,
+      answer,
       actions: null,
       refId: best.doc.doc_key,
       docIds: [best.doc.doc_key],

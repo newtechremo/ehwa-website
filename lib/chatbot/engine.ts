@@ -122,9 +122,8 @@ export function matchFaq(input: string): { faq: ChatFaq; score: number } | null 
       //   입력 ⊂ 변형  → 일반 질문이 더 구체적인 FAQ 로 끌려간다.
       //     실측: "무료인가요" ⊂ "서비스 이용하면 주차비 무료인가요?" → 비용 질문에 주차 안내.
       //     변형이 입력보다 4자 이내로만 길 때(사실상 같은 문장)만 인정한다.
-      if (norm.length >= 4 && norm.includes(nq)) {
-        score = Math.max(score, 0.9)
-      } else if (norm.length >= 4 && nq.includes(norm) && nq.length <= norm.length + 4) {
+      const nearSame = Math.abs(norm.length - nq.length) <= 4
+      if (norm.length >= 4 && nearSame && (norm.includes(nq) || nq.includes(norm))) {
         score = Math.max(score, 0.9)
       }
       // 유사도는 의문형 잡음을 뺀 내용어끼리 비교한다

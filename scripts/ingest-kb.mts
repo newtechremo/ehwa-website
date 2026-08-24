@@ -20,6 +20,7 @@ type Doc = {
   category: string
   topic: string
   questions: string[]
+  short_answer: string | null
   answer: string
   body: string
 }
@@ -47,6 +48,9 @@ function parse(file: string): Doc | null {
     // 실제 질문이 아니므로 제외하고, 검색은 제목·본문 소제목으로 처리한다.
     .filter((q) => q && !/^\(?\s*예상\s*질문\s*없음\s*\)?$/.test(q))
 
+  const shortSection = raw.split(/^##\s*짧은 답변\s*$/m)[1]?.split(/^##\s/m)[0] ?? ""
+  const short_answer = shortSection.trim() || null
+
   // 답변 가이드 섹션
   const aSection = raw.split(/^##\s*답변 가이드\s*$/m)[1] ?? ""
   const answer = aSection.replace(/^#\s+.*\n+/, "").trim()
@@ -61,7 +65,7 @@ function parse(file: string): Doc | null {
     questions.push(topic, ...heads.slice(0, 12))
   }
 
-  return { doc_key: base, seq, category, topic, questions, answer, body: raw.trim() }
+  return { doc_key: base, seq, category, topic, questions, short_answer, answer, body: raw.trim() }
 }
 
 const files = readdirSync(DIR).filter((f) => f.endsWith(".md")).sort()
