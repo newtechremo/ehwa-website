@@ -1,25 +1,25 @@
 # Chatbot Browser QA
 
-- Preview URL: https://ehwa-website-pj30rh7lm-remo-dev.vercel.app (SSO 보호 — bypass 필요)
-- Git commit: `4a43915` (환경 검증 기준) — 이후 커밋 반영 시 새 Preview 로 갱신할 것
-- 수행일/KST: (미실행 — 기입)
-- 수행자: (기입)
-- 채널톡 비교 기준: 기존 `closed` 15건 export는 전체 이력이 아니므로 성능 기준에서 폐기. 모든 상태
-  28건(`closed` 15 + `initial` 13)의 재수집·독립 채점 필요. 상세는
-  `docs/자체챗봇_현재현황_및_RAG_QA_근본원인분석_20260824.md` 참조
+- Preview URL: https://ehwa-website-git-feat-chatbot-rag-reliability-remo-dev.vercel.app
+  (Deployment Protection 302 — bypass 필요)
+- Git commit: `26e955241c51632e74ebb1a1df0ead977ddb2eab`
+- 자동 검증일/KST: 2026-08-24
+- 수동 수행자: 미지정
+- 채널톡 비교 기준: 4개 상태 28건·620메시지·163문항 전체 replay. 결과는
+  `docs/채널톡_실대화_비교결과_20260824.md` 참조
 
-## 사전 자동 검증 (2026-08-24, API·Playwright — 사람 검수를 대체하지 않음)
+## 사전 자동 검증 (2026-08-24, 사람 검수를 대체하지 않음)
 
 | 항목 | 결과 |
 |---|---|
-| 채널톡 SDK 미로드 / 자체 위젯만 노출 | ✓ (HTML 검사 0회) |
-| /admin 런처 미노출 | ✓ |
-| 런처 → 웰컴 + 빠른 선택 6버튼 | ✓ (Playwright) |
-| FAQ·정책차단·범위밖 fallback + 연결 카드 | ✓ (API) |
-| 질문 1건 = 로그 1행 (`env=preview`) | ✓ (6건=6행, after() 수정 후) |
-| purge-logs 무인증 401 / 인증 200 | ✓ |
-| Production 로그 오염 | 0행 ✓ |
-| AI 답변 경로 (KB 전문 + 출처 검증) | 16:00 한도 리셋 후 확인 |
+| Git Preview | `Ready`, commit·branch 일치 ✓ |
+| Deployment Protection | 무인증 302 ✓ |
+| health | `namespace=preview`, limit 396, KB 59, model/embedding configured ✓ |
+| critical canary | 10/10, 모델 시도·예산 증가 0 ✓ |
+| 채널톡 SDK 미로드 / 자체 위젯만 포함 | 현재 Preview HTML에서 SDK 0·위젯 1 ✓ |
+| 전체 ChannelTalk replay | 163/163 실행, 로그 163행 ✓ |
+| replay 응답시간 | p95 1.89초, 최대 2.31초, 15초 초과 0 ✓ |
+| replay 내용 coverage | 자체 fallback 개선 후보 20건 **실패(P1)** |
 
 ## 수동 검수 매트릭스 (병원 승인용 — 전 셀 판정·증빙 필수)
 
@@ -39,9 +39,11 @@
 | ID | 심각도 | 환경 | 재현 절차 | 기대/실제 | 담당 | 상태 | 재검수 증빙 |
 |---|---|---|---|---|---|---|---|
 | D1 | P0(수정됨) | Vercel 서버리스 | 자유질문 5건 연속 | 로그 5행 / 4행 (유실) | Claude | `4a43915` 수정, 6건=6행 재검수 통과 | 본 문서 사전 검증 표 |
+| D2 | P1 | 전체 replay | 163문항 재생 | ChannelTalk 핵심 안내/자체 fallback 0건 / 개선 후보 20건 | 개발 | 미해결 | `docs/채널톡_실대화_비교결과_20260824.md` |
 
 ## 최종 승인
 
-- P0 미해결: 0 (D1 수정됨) / P1 미해결: 미집계 (수동 검수 미실행)
-- 개발 승인자/일시: (기입)
-- 병원 승인자/일시: (기입)
+- P0 미해결: 0 / P1 미해결: 1(D2), 수동 검수 미실행
+- 개발 승인자/일시: 미승인
+- 병원 승인자/일시: 미승인
+- 출시 판정: **차단 — Production은 ChannelTalk 유지**

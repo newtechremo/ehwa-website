@@ -5,6 +5,9 @@
 - Production은 계속 ChannelTalk을 사용한다.
 - 자체 챗봇은 Preview 검증과 병원 문구·UI 승인 전까지 Production에서 켜지 않는다.
 - 2026-08-24 로컬 기준: critical 10/10, full 82/82, retrieval 10/10 Top-3.
+- 최신 Preview: commit `26e9552`, `Ready`, 보호 302, namespace `preview`, 한도 396,
+  KB 59, critical 10/10이다.
+- 전체 상담 replay 163건에서 개선 후보 fallback 20건이 남아 **Production 전환은 차단**한다.
 - Git Markdown 재적재 기준 예상질문은 현재 285개다. 과거 로컬 DB의 297개와 달랐으므로 DB 행 수가 아니라 Git 원문과 ingest 결과를 기준으로 검수한다.
 
 ## 환경과 사용량 namespace
@@ -53,6 +56,12 @@ npm run chatbot:report -- --day YYYY-MM-DD --namespace qa-local --limit 1000
 - 커밋 후 기존 결과는 즉시 stale이 된다. 현재 commit에서 다시 실행하지 않은 결과를 승인자료로 쓰지 않는다.
 - Preview에서는 critical만, Production에서는 승인된 synthetic 질문 1건만 실행한다.
 
+2026-08-24 실제 `qa-local` 사용량은 full QA 전 394에서 full 82문항 후 522,
+ChannelTalk 163문항 replay 후 790으로 증가했다. 증가 396회는 full의 128회와 replay의
+268회 합계와 정확히 같다. 따라서 같은 namespace에서 관찰된 대량 사용량은 사람 채팅이 아니라
+agent QA가 만든 것이다. 과거 500회도 반복 QA와 당시 재시도 경로로 설명되며, 결제 연결 여부와
+무관하다.
+
 ## 사용량과 장애 진단
 
 ```bash
@@ -90,10 +99,13 @@ select adjust_chatbot_budget(
 ## 배포와 rollback
 
 1. Preview에 마이그레이션과 KB를 적용한다.
-2. 정확한 Preview URL과 Git commit을 기록하고 critical/browser/accessibility QA를 수행한다.
-3. P0/P1 0건과 병원 문구·UI 승인을 받은 뒤에만 `NEXT_PUBLIC_CHATBOT_ENABLED=true`로 전환한다.
-4. 장애 시 즉시 feature flag를 `false`로 되돌리고 재배포해 ChannelTalk으로 복귀한다.
-5. DB migration은 가산형이므로 긴급 rollback에서 테이블을 삭제하지 않는다. 위젯 flag만 되돌린다.
+2. 기능 브랜치를 push해 Git Preview를 만들고 환경변수 변경 뒤 그 Git 배포를 redeploy한다.
+   worktree에서 `vercel deploy`로 파일을 직접 업로드하지 않는다. 로컬 전용 env symlink가 포함될
+   수 있기 때문이다.
+3. 정확한 Preview URL과 Git commit을 기록하고 critical/browser/accessibility QA를 수행한다.
+4. P0/P1 0건과 병원 문구·UI 승인을 받은 뒤에만 `NEXT_PUBLIC_CHATBOT_ENABLED=true`로 전환한다.
+5. 장애 시 즉시 feature flag를 `false`로 되돌리고 재배포해 ChannelTalk으로 복귀한다.
+6. DB migration은 가산형이므로 긴급 rollback에서 테이블을 삭제하지 않는다. 위젯 flag만 되돌린다.
 
 ## 개인정보와 이력
 
