@@ -123,7 +123,9 @@ export async function POST(request: Request) {
   const hits = rankKb(question, docs, 5)
   const best = hits[0]
 
-  if (best && best.score >= KB_DIRECT_THRESHOLD) {
+  // 직답은 예상질문과 직접 닮은 경우(qScore)만. 종합 점수는 커버리지 가산 때문에
+  // 일반어 질의("진료 예약", "신청")에서 엉뚱한 문서를 임계 위로 밀어올렸다(실측).
+  if (best && best.qScore >= KB_DIRECT_THRESHOLD) {
     after(() => logChat({
       sessionId, kind: "ai_answer", userInput: question,
       answer: best.doc.answer,
@@ -225,7 +227,8 @@ export async function POST(request: Request) {
 
   const extractSeqs = (t: string) => {
     const seqs = new Set<number>()
-    for (const m of t.matchAll(/\[?\s*출처\s*[::]\s*([0-9,\s]+)\]?/g)) {
+    // 모델이 "출처: 문서 12" 처럼 '문서' 를 끼워 쓰는 변형도 받는다
+    for (const m of t.matchAll(/\[?\s*출처\s*[::]\s*(?:문서\s*)?([0-9,\s]+)\]?/g)) {
       for (const n of m[1].split(",")) {
         const v = Number(n.trim())
         if (Number.isInteger(v)) seqs.add(v)
@@ -261,7 +264,11 @@ export async function POST(request: Request) {
 
   const seqs = extractSeqs(text)
   const cited = docs.filter((d) => seqs.has(d.seq)).map((d) => d.doc_key)
-  if (cited.length === 0) return fallback("no_citation")
+  if (cited.length === 0) {
+    // 어떤 표기를 쓰다 탈락했는지 남긴다. 사유의 retry 유무로 재시도 동작도 검증된다.
+    console.error("chatbot ask - no_citation 원문 끝부분:", JSON.stringify(text.slice(-160)))
+    return fallback(retried ? "no_citation_after_retry" : "no_citation")
+  }
 
   // 모델이 [출처: X] / 출처: [X] / 출처: X 등으로 다양하게 쓰므로 모두 걷어낸다.
   // 남은 홀괄호까지 정리하지 않으면 말풍선 끝에 "]" 같은 찌꺼기가 보인다(실측).

@@ -66,7 +66,21 @@ function similarity(a: string, b: string): number {
   return inter / (A.size + B.size - inter)
 }
 
-export type KbHit = { doc: KbDoc; score: number; matched: string }
+export type KbHit = {
+  doc: KbDoc
+  score: number
+  matched: string
+  /**
+   * 예상질문·부분포함만으로 계산한 직답 확신도 (2026-08-24).
+   *
+   * 직답 게이트를 종합 점수(score)에서 이 값으로 바꿨다. 종합 점수의 커버리지
+   * 가산(+0.45)은 "진료·예약·신청" 같은 일반어 질의에서 아무 문서나 임계를
+   * 넘겨줬고, 패치할 때마다 다른 오답이 나왔다(실측: 진료 예약 → 편의지원 신청
+   * → 국제진료 순으로 이동). 예상질문과 직접 닮은 경우만 원문 직답을 내보내고,
+   * 애매하면 LLM 전체 대조가 결정한다 — LLM 은 이 질문들을 전부 맞혔다.
+   */
+  qScore: number
+}
 
 /** 조사·어미를 떼어 검색용 토큰을 만든다 (형태소 분석기 없이 근사) */
 const SUFFIXES = [
@@ -85,10 +99,18 @@ const STOPWORDS = new Set([
   "알려","알려주세","알려주","가능","되나","하나","인가","있나","없나","이나","저나",
   "문의","궁금","해주","해줘","주세","주시","합니","습니","해도","해야","할까","이야",
   "가요","이대목동",
-  // "신청·이용·서비스·안내·방법·병원"은 넣지 않는다.
+  // 의문형·존재 표현 (2026-08-24): "어떻게 이용할 수 있어요?" 의 토큰이 전부
+  // 흔한 말이라 거의 모든 문서에서 커버리지 1.0 → +0.45 무차별 가산으로
+  // 이용대상 문서가 0.88 직답을 받았다. 실측 후 추가.
+  "있어요","있나요","없어요","없나요","해요","돼요","되요","주나요","이용할","할수",
+  // "신청·이용·서비스·안내·방법·병원"(어간)은 넣지 않는다.
   // 이 도메인의 핵심어라 불용어로 두면 "동행 신청 어떻게 해요" 같은 질의가
   // "동행해요"로 축소돼 정답 문서를 못 찾는다(실측). 오답은 불용어가 아니라
   // IDF 가중치로 다스린다.
+  // 단 활용형 "이용할"은 예외로 넣는다: 거의 모든 문서에 등장해 변별력이 없고,
+  // 어간 "이용"은 SUFFIXES 가 못 떼는 형태라 커버리지만 부풀렸다(실측:
+  // "어떻게 이용할 수 있어요?" → 전 문서 cov 1.0). 골든 297 Top-1 은 288→289 로
+  // 오히려 올랐다.
 ])
 
 export function tokenize(text: string): string[] {
@@ -165,6 +187,7 @@ export function rankKb(input: string, docs: KbDoc[], limit = 5): KbHit[] {
   const norm = normalize(input)
   if (!norm) return []
   const qTokens = tokenize(input)
+  const qContentTokens = qTokens.filter((t) => !STOPWORDS.has(t))
   const idf = buildIdf(docs)
   const qKey = contentKey(input)
 
@@ -178,13 +201,20 @@ export function rankKb(input: string, docs: KbDoc[], limit = 5): KbHit[] {
       if (!nq) continue
       // 원문 그대로의 일치는 강한 신호로 유지하되,
       // 유사도 자체는 내용어 기준으로 계산해 의문형 편향을 없앤다.
+      // 부분 포함은 변형⊂입력 방향만 인정한다(FAQ 엔진과 동일 근거, 2026-08-24):
+      // "무료인가요" ⊂ "서비스 이용하면 주차비 무료인가요?" 로 비용 질문이
+      // 주차 문서 직답을 받았다. 반대 방향은 사실상 같은 문장일 때만 인정.
       let sc = similarity(qKey, contentKey(q))
-      if (norm.length >= 5 && (norm.includes(nq) || nq.includes(norm))) sc = Math.max(sc, 0.88)
+      if (norm.length >= 5 && (norm.includes(nq) || (nq.includes(norm) && nq.length <= norm.length + 4))) {
+        sc = Math.max(sc, 0.88)
+      }
       if (sc > best) {
         best = sc
         matched = q
       }
     }
+
+    const qScore = best
 
     // ② 주제명 유사도
     const topicScore = similarity(qKey, contentKey(doc.topic)) * 0.7
@@ -195,10 +225,12 @@ export function rankKb(input: string, docs: KbDoc[], limit = 5): KbHit[] {
 
     // ③ 본문 토큰 커버리지 — 표현이 달라도 핵심어가 문서에 있으면 잡아낸다.
     //    ①②를 대체하지 않고 더해 주는 보조 신호다.
-    const cov = idfCoverage(qTokens, searchBlob(doc), idf)
+    //    불용어(의문형·일반어)는 세지 않는다. 전부 흔한 말인 질의는 cov 가 0이 되어
+    //    직답 대신 LLM 전체 대조로 넘어간다 — 그게 맞는 동작이다.
+    const cov = idfCoverage(qContentTokens, searchBlob(doc), idf)
     const score = Math.min(1, best + cov * 0.45)
 
-    if (score > 0) hits.push({ doc, score, matched: matched || doc.topic })
+    if (score > 0) hits.push({ doc, score, matched: matched || doc.topic, qScore })
   }
 
   hits.sort((a, b) => b.score - a.score)

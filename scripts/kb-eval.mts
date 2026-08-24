@@ -26,7 +26,8 @@ for (const d of docs) {
     scores.push(s)
     if (hits[0]?.doc.id === d.id) {
       top1 += 1
-      if (s >= KB_DIRECT_THRESHOLD) aboveDirect += 1
+      // 직답 게이트는 qScore 기준 (ask 라우트와 동일)
+      if ((hits[0]?.qScore ?? 0) >= KB_DIRECT_THRESHOLD) aboveDirect += 1
     } else {
       miss.push(`  ✗ [${d.seq}] "${q.slice(0, 32)}" → ${hits[0]?.doc.seq}(${s.toFixed(2)})`)
     }

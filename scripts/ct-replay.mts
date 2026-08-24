@@ -75,7 +75,8 @@ for (const c of chats) {
     const key = `${c.id}|${m.createdAt}`
     const cached = prevMap.get(key)
     let row: Row
-    if (retryMode && cached && cached.our_reason !== "model_error" && cached.our_source !== "error") {
+    if (retryMode && cached && cached.our_reason !== "model_error" &&
+        cached.our_source !== "error" && cached.our_source !== "rate_limited") {
       row = cached // 이미 유효한 결과는 재호출하지 않는다
     } else {
       const d = await ask(mask(q), sid, history.slice(-4))
@@ -86,7 +87,8 @@ for (const c of chats) {
         our_reason: String(d.reason ?? ""),
         our_answer: (d.answer ?? "").trim(),
       }
-      await new Promise((r) => setTimeout(r, d.source === "ai" || d.source === "fallback" ? 3000 : 300))
+      // 자체 rate limit(세션당 분당 8회)에 걸리지 않도록 AI 경로는 넉넉히 쉰다
+      await new Promise((r) => setTimeout(r, d.source === "ai" || d.source === "fallback" || d.source === "rate_limited" ? 9000 : 300))
     }
     rows.push(row)
     // 맥락 갱신 — ChatWidget 과 동일 필터 (user + ai/faq 만, kb 직답·fallback 제외)
