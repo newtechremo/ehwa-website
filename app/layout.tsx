@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import Script from "next/script"
+import { ChatWidget } from "@/components/chat/ChatWidget"
 import "./globals.css"
 
 const _geist = Geist({ subsets: ["latin"] })
@@ -76,7 +77,11 @@ export default function RootLayout({
         {children}
         <Analytics />
 
-        {/* 채널톡 챗봇 - 우측 하단 플로팅 버튼 */}
+        {/* 자체 구축 챗봇 (Phase A). 플래그가 켜지면 채널톡 대신 이것만 노출된다 */}
+        <ChatWidget />
+
+        {/* 채널톡 챗봇 - 자체 챗봇 비활성 시에만 로드 (위젯 2개 동시 노출 방지) */}
+        {process.env.NEXT_PUBLIC_CHATBOT_ENABLED !== "true" ? (
         <Script
           id="channel-talk-sdk"
           strategy="afterInteractive"
@@ -89,6 +94,7 @@ export default function RootLayout({
             `,
           }}
         />
+        ) : null}
       </body>
     </html>
   )

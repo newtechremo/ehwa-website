@@ -52,10 +52,10 @@ export type FeaturedSlotsRow = {
 }
 
 // ============ 경계 변환 (Postgres boolean <-> 기존 number 0/1) ============
-function toPostRow(r: any): PostRow {
+function toPostRow(r: Record<string, unknown>): PostRow {
   return { ...r, status: r.status ? 1 : 0 } as PostRow
 }
-function toAttachmentRow(r: any): AttachmentRow {
+function toAttachmentRow(r: Record<string, unknown>): AttachmentRow {
   return { ...r, isLegacy: r.isLegacy ? 1 : 0 } as AttachmentRow
 }
 
@@ -101,7 +101,7 @@ export async function createPost(post: Omit<PostRow, "id"> & { id?: number }): P
 }
 
 export async function updatePost(id: number, post: Partial<PostRow>): Promise<boolean> {
-  const patch: Record<string, any> = { updatedAt: new Date().toISOString() }
+  const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() }
   if (post.title !== undefined) patch.title = post.title
   if (post.content !== undefined) patch.content = post.content
   if (post.thumbnailImage !== undefined) patch.thumbnailImage = post.thumbnailImage || null

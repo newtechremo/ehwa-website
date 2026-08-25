@@ -22,7 +22,7 @@ export default function AdminLayout({
   const pathname = usePathname()
   const router = useRouter()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const [sessionChecked, setSessionChecked] = useState(false)
 
   // 로그인 페이지는 레이아웃 적용 안함
   const isLoginPage = pathname === "/admin/login"
@@ -46,19 +46,30 @@ export default function AdminLayout({
     }
   }, [])
 
-  useEffect(() => {
-    if (isLoginPage) {
-      setIsLoading(false)
-      return
-    }
+  // 로그인 페이지는 세션 확인이 필요 없다. effect 에서 상태를 덮어쓰는 대신 파생값으로 둔다.
+  const isLoading = !isLoginPage && !sessionChecked
 
-    const authStatus = localStorage.getItem("isAuthenticated")
-    if (authStatus === "true") {
-      setIsAuthenticated(true)
-    } else {
-      router.push("/admin/login")
+  useEffect(() => {
+    if (isLoginPage) return
+
+    // 서버에 세션 유효성을 확인한다 (localStorage 플래그는 신뢰하지 않는다)
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/admin/session", { cache: "no-store" })
+        const data = await res.json().catch(() => ({}))
+        if (cancelled) return
+        if (data?.authenticated) setIsAuthenticated(true)
+        else router.push("/admin/login")
+      } catch {
+        if (!cancelled) router.push("/admin/login")
+      } finally {
+        if (!cancelled) setSessionChecked(true)
+      }
+    })()
+    return () => {
+      cancelled = true
     }
-    setIsLoading(false)
   }, [router, isLoginPage])
 
   const menuItems = [
@@ -76,9 +87,15 @@ export default function AdminLayout({
     },
   ]
 
-  const handleLogout = () => {
-    localStorage.removeItem("isAuthenticated")
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/admin/logout", { method: "POST" })
+    } catch {
+      /* 쿠키 삭제 실패해도 로그인 화면으로 보낸다 */
+    }
+    localStorage.removeItem("isAuthenticated") // 구버전 잔여 플래그 정리
     router.push("/admin/login")
+    router.refresh()
   }
 
   // 로그인 페이지는 레이아웃 없이 렌더링

@@ -15,14 +15,31 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault()
+  const [submitting, setSubmitting] = useState(false)
 
-    if (username === "admin" && password === "admin123") {
-      localStorage.setItem("isAuthenticated", "true")
-      router.push("/admin/posts")
-    } else {
-      setError("아이디 또는 비밀번호가 올바르지 않습니다.")
+  // 비밀번호 검증은 서버가 한다. 성공 시 httpOnly 세션 쿠키가 발급된다.
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (submitting) return
+    setError("")
+    setSubmitting(true)
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data?.success) {
+        router.push("/admin/posts")
+        router.refresh()
+      } else {
+        setError(data?.error || "로그인에 실패했습니다.")
+      }
+    } catch {
+      setError("서버에 연결할 수 없습니다.")
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -60,11 +77,10 @@ export default function AdminLoginPage() {
               />
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full">
-              로그인
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting ? "확인 중..." : "로그인"}
             </Button>
           </form>
-          <p className="text-xs text-muted-foreground text-center mt-4">테스트 계정: admin / admin123</p>
         </CardContent>
       </Card>
     </div>

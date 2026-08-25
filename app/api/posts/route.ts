@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isAuthConfigured, isAuthenticated } from "@/lib/auth"
 import {
   getAllPostsWithAttachments,
   getPostWithAttachments,
@@ -18,6 +19,20 @@ export const maxDuration = 60
 export const fetchCache = "force-no-store"
 
 // GET: 게시글 목록 조회
+/** 쓰기 요청은 관리자 세션이 있어야 한다 */
+function denyIfUnauthorized(request: Request) {
+  if (!isAuthConfigured()) {
+    return NextResponse.json(
+      { success: false, error: "서버에 관리자 인증이 설정되지 않았습니다." },
+      { status: 503 },
+    )
+  }
+  if (!isAuthenticated(request)) {
+    return NextResponse.json({ success: false, error: "인증이 필요합니다." }, { status: 401 })
+  }
+  return null
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -49,6 +64,9 @@ export async function GET(request: Request) {
 
 // POST: 게시글 저장
 export async function POST(request: Request) {
+  const denied = denyIfUnauthorized(request)
+  if (denied) return denied
+
   try {
     const text = await request.text()
     const body = JSON.parse(text)
@@ -72,7 +90,7 @@ export async function POST(request: Request) {
 
         // 첨부파일 추가
         const attachments = post.attachments || []
-        if (post.attachment && !attachments.find((a: any) => a.name === post.attachment.name)) {
+        if (post.attachment && !attachments.find((a: { name?: string }) => a.name === post.attachment.name)) {
           attachments.push(post.attachment)
         }
 
@@ -161,6 +179,9 @@ export async function POST(request: Request) {
 
 // DELETE: 게시글 삭제
 export async function DELETE(request: Request) {
+  const denied = denyIfUnauthorized(request)
+  if (denied) return denied
+
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")

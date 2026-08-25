@@ -1,0 +1,309 @@
+import { createClient } from "@supabase/supabase-js"
+
+/**
+ * KB 지식문서 검색.
+ *
+ * AI Instruction의 대원칙이 "KB 우선 — 일치하는 문서의 '답변 가이드'를 그대로 사용"이다.
+ * 59개 문서가 각각 예상 질문을 약 10개씩(총 187개) 갖고 있으므로,
+ * 상당수 질문은 LLM 없이 검색만으로 정확히 답할 수 있다.
+ * LLM은 이 검색이 실패한 경우에만 사용한다(비용·지연·환각 모두 줄어든다).
+ */
+
+export type KbDoc = {
+  id: number
+  doc_key: string
+  seq: number
+  category: string
+  topic: string
+  questions: string[]
+  short_answer: string | null
+  answer: string
+}
+
+let cache: { at: number; docs: KbDoc[] } | null = null
+const TTL_MS = 5 * 60 * 1000
+
+export async function loadKb(): Promise<KbDoc[]> {
+  if (cache && Date.now() - cache.at < TTL_MS) return cache.docs
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return []
+
+  const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+  const { data, error } = await db
+    .from("kb_documents")
+    .select("id, doc_key, seq, category, topic, questions, short_answer, answer")
+    .eq("published", true)
+    .order("seq")
+
+  if (error || !data) return cache?.docs ?? []
+  cache = { at: Date.now(), docs: data as KbDoc[] }
+  return cache.docs
+}
+
+export function normalize(input: string): string {
+  return input.toLowerCase().replace(/[^0-9a-z가-힣]/g, "").trim()
+}
+
+function bigrams(s: string): Set<string> {
+  const out = new Set<string>()
+  if (s.length < 2) {
+    if (s) out.add(s)
+    return out
+  }
+  for (let i = 0; i < s.length - 1; i += 1) out.add(s.slice(i, i + 2))
+  return out
+}
+
+function similarity(a: string, b: string): number {
+  const A = bigrams(a)
+  const B = bigrams(b)
+  if (!A.size || !B.size) return 0
+  let inter = 0
+  A.forEach((g) => {
+    if (B.has(g)) inter += 1
+  })
+  return inter / (A.size + B.size - inter)
+}
+
+export type KbHit = {
+  doc: KbDoc
+  score: number
+  matched: string
+  /**
+   * 예상질문·부분포함만으로 계산한 직답 확신도 (2026-08-24).
+   *
+   * 직답 게이트를 종합 점수(score)에서 이 값으로 바꿨다. 종합 점수의 커버리지
+   * 가산(+0.45)은 "진료·예약·신청" 같은 일반어 질의에서 아무 문서나 임계를
+   * 넘겨줬고, 패치할 때마다 다른 오답이 나왔다(실측: 진료 예약 → 편의지원 신청
+   * → 국제진료 순으로 이동). 예상질문과 직접 닮은 경우만 원문 직답을 내보내고,
+   * 애매하면 LLM 전체 대조가 결정한다 — LLM 은 이 질문들을 전부 맞혔다.
+   */
+  qScore: number
+}
+
+/** 조사·어미를 떼어 검색용 토큰을 만든다 (형태소 분석기 없이 근사) */
+const SUFFIXES = [
+  "입니까","인가요","한가요","되나요","하나요","할까요","은가요","나요","까요","어요","에요","예요",
+  "에서","으로","에게","한테","까지","부터","이랑","라도","이나","마다","조차","보다",
+  "은","는","이","가","을","를","에","의","도","만","와","과","로","랑","께",
+]
+
+/**
+ * 의문사·일반 동사 등 변별력 없는 낱말.
+ * "외래 예약은 어떻게 하나요" 와 "어떻게 신청하나요" 는 의문형이 같다는 이유만으로
+ * 문자 2-gram 유사도가 0.67까지 나온다(실측). 비교 전에 걸러낸다.
+ */
+const STOPWORDS = new Set([
+  "어떻게","어떤","무엇","뭐가","뭔가","어디","어디서","언제","누가","누구","왜","얼마",
+  "알려","알려주세","알려주","가능","되나","하나","인가","있나","없나","이나","저나",
+  "문의","궁금","해주","해줘","주세","주시","합니","습니","해도","해야","할까","이야",
+  "가요","이대목동",
+  // 의문형·존재 표현 (2026-08-24): "어떻게 이용할 수 있어요?" 의 토큰이 전부
+  // 흔한 말이라 거의 모든 문서에서 커버리지 1.0 → +0.45 무차별 가산으로
+  // 이용대상 문서가 0.88 직답을 받았다. 실측 후 추가.
+  "있어요","있나요","없어요","없나요","해요","돼요","되요","주나요","이용할","할수",
+  // "신청·이용·서비스·안내·방법·병원"(어간)은 넣지 않는다.
+  // 이 도메인의 핵심어라 불용어로 두면 "동행 신청 어떻게 해요" 같은 질의가
+  // "동행해요"로 축소돼 정답 문서를 못 찾는다(실측). 오답은 불용어가 아니라
+  // IDF 가중치로 다스린다.
+  // 단 활용형 "이용할"은 예외로 넣는다: 거의 모든 문서에 등장해 변별력이 없고,
+  // 어간 "이용"은 SUFFIXES 가 못 떼는 형태라 커버리지만 부풀렸다(실측:
+  // "어떻게 이용할 수 있어요?" → 전 문서 cov 1.0). 골든 297 Top-1 은 288→289 로
+  // 오히려 올랐다.
+])
+
+export function tokenize(text: string): string[] {
+  const out: string[] = []
+  for (const raw of text.toLowerCase().split(/[^0-9a-z가-힣]+/)) {
+    if (!raw) continue
+    let t = raw
+    for (const suf of SUFFIXES) {
+      if (t.length > suf.length + 1 && t.endsWith(suf)) {
+        t = t.slice(0, -suf.length)
+        break
+      }
+    }
+    if (t.length >= 2) out.push(t)
+  }
+  return out
+}
+
+/**
+ * IDF 가중 토큰 커버리지.
+ *
+ * 단순 커버리지는 "예약", "어떻게", "병원" 같은 일반어까지 똑같이 세기 때문에
+ * 엉뚱한 문서가 높은 점수를 받는다(실측: "외래 예약" → 편의지원 신청 절차 0.65).
+ * 문서 빈도가 낮은 단어(외래·휠체어·응급실 등)에 가중치를 줘 변별력을 회복한다.
+ */
+function idfCoverage(queryTokens: string[], blob: string, idf: Map<string, number>): number {
+  if (!queryTokens.length) return 0
+  let total = 0
+  let hit = 0
+  for (const t of queryTokens) {
+    const w = idf.get(t) ?? Math.log(60) // 코퍼스에 없는 단어는 최대 가중치
+    total += w
+    if (blob.includes(t)) hit += w
+  }
+  return total > 0 ? hit / total : 0
+}
+
+const idfCache = new WeakMap<object, Map<string, number>>()
+function buildIdf(docs: KbDoc[]): Map<string, number> {
+  const cached = idfCache.get(docs)
+  if (cached) return cached
+
+  const df = new Map<string, number>()
+  for (const doc of docs) {
+    const seen = new Set(tokenize([doc.topic, ...doc.questions, doc.answer.slice(0, 2500)].join(" ")))
+    seen.forEach((t) => df.set(t, (df.get(t) ?? 0) + 1))
+  }
+  const N = docs.length || 1
+  const idf = new Map<string, number>()
+  df.forEach((n, t) => idf.set(t, Math.log((N + 1) / (n + 0.5))))
+  idfCache.set(docs, idf)
+  return idf
+}
+
+/** 의문형·일반어를 제거한 내용어만 이어붙인 비교용 문자열 */
+export function contentKey(text: string): string {
+  return tokenize(text)
+    .filter((t) => !STOPWORDS.has(t))
+    .join("")
+}
+
+const blobCache = new WeakMap<KbDoc, string>()
+function searchBlob(doc: KbDoc): string {
+  let b = blobCache.get(doc)
+  if (b === undefined) {
+    b = normalize([doc.topic, doc.category, ...doc.questions, doc.answer.slice(0, 2500)].join(" "))
+    blobCache.set(doc, b)
+  }
+  return b
+}
+
+/** 질문과 가장 가까운 문서들을 점수순으로 반환 */
+export function rankKb(input: string, docs: KbDoc[], limit = 5): KbHit[] {
+  const norm = normalize(input)
+  if (!norm) return []
+  const qTokens = tokenize(input)
+  const qContentTokens = qTokens.filter((t) => !STOPWORDS.has(t))
+  const idf = buildIdf(docs)
+  const qKey = contentKey(input)
+
+  const hits: KbHit[] = []
+  for (const doc of docs) {
+    // ① 예상 질문과의 문자 2-gram 유사도 (정확 표현에 강함)
+    let best = 0
+    let matched = ""
+    for (const q of doc.questions) {
+      const nq = normalize(q)
+      if (!nq) continue
+      // 원문 그대로의 일치는 강한 신호로 유지하되,
+      // 유사도 자체는 내용어 기준으로 계산해 의문형 편향을 없앤다.
+      // 부분 포함은 변형⊂입력 방향만 인정한다(FAQ 엔진과 동일 근거, 2026-08-24):
+      // "무료인가요" ⊂ "서비스 이용하면 주차비 무료인가요?" 로 비용 질문이
+      // 주차 문서 직답을 받았다. 반대 방향은 사실상 같은 문장일 때만 인정.
+      let sc = similarity(qKey, contentKey(q))
+      const nearSame = Math.abs(norm.length - nq.length) <= 4
+      if (norm.length >= 5 && nearSame && (norm.includes(nq) || nq.includes(norm))) {
+        sc = Math.max(sc, 0.88)
+      }
+      if (sc > best) {
+        best = sc
+        matched = q
+      }
+    }
+
+    const qScore = best
+
+    // ② 주제명 유사도
+    const topicScore = similarity(qKey, contentKey(doc.topic)) * 0.7
+    if (topicScore > best) {
+      best = topicScore
+      matched = doc.topic
+    }
+
+    // ③ 본문 토큰 커버리지 — 표현이 달라도 핵심어가 문서에 있으면 잡아낸다.
+    //    ①②를 대체하지 않고 더해 주는 보조 신호다.
+    //    불용어(의문형·일반어)는 세지 않는다. 전부 흔한 말인 질의는 cov 가 0이 되어
+    //    직답 대신 LLM 전체 대조로 넘어간다 — 그게 맞는 동작이다.
+    const cov = idfCoverage(qContentTokens, searchBlob(doc), idf)
+    const score = Math.min(1, best + cov * 0.45)
+
+    if (score > 0) hits.push({ doc, score, matched: matched || doc.topic, qScore })
+  }
+
+  hits.sort((a, b) => b.score - a.score)
+  return hits.slice(0, limit)
+}
+
+const LOCATION_QUERY_WORDS = new Set([
+  "어디", "위치", "알려", "알려줘", "알려주세", "어떻게", "가", "가요", "있어", "있어요",
+  "위주", "지금", "현재", "응응", "이동", "동선", "병원",
+  "고마워", "고맙습니다", "감사해", "감사합니다",
+])
+const LOCATION_CONTEXT_WORDS = new Set([
+  "본관", "별관", "정문", "후문", "주차장", "응급실", "앞", "엘베", "엘리베이터",
+])
+
+/** 구조화된 위치 문서의 소제목 중 현재 대화와 가장 구체적으로 맞는 원문 경로를 고른다. */
+export function selectLocationAnswer(doc: KbDoc, inputs: string[]): string | null {
+  const terms = [...new Set(inputs.flatMap((text) => text.toLowerCase().split(/[^0-9a-z가-힣]+/))
+    .map((term) => term.replace(/(?:이에요|예요|에요|에서|으로|에게|한테|까지|부터|에는|은|는|이|가|을|를|에|도|만|요|로)$/, ""))
+    .filter((term) => term.length >= 2 && !LOCATION_QUERY_WORDS.has(term) &&
+      !/^(?:어디|어딘|알려|어떻게|가고싶|있(?:어|나|니))/.test(term)))]
+  if (!terms.length) return null
+  const matchesTerm = (value: string, term: string) => {
+    const floor = term.match(/^(\d+)\s*층$/)
+    return floor
+      ? new RegExp(`(?:^|\\s|[()])${floor[1]}\\s*층`).test(value)
+      : normalize(value).includes(normalize(term))
+  }
+
+  let best: { section: string; header: string; score: number; index: number } | null = null
+  for (const section of doc.answer.split(/(?=^##\s)/m)) {
+    const header = section.match(/^##\s+(.+)$/m)?.[1]?.trim()
+    if (!header) continue
+    const knowledgeKey = normalize(`${doc.topic}\n${section}`)
+    const specificTerms = terms.filter((term) => !LOCATION_CONTEXT_WORDS.has(term) &&
+      !/^(?:(?:본관|별관).*)?\d+\s*층/.test(term))
+    const score = terms.filter((term) => matchesTerm(header, term)).length * 2 +
+      specificTerms.filter((term) => knowledgeKey.includes(normalize(term))).length
+    const hasDestination = specificTerms.length > 0 && specificTerms.every((term) => knowledgeKey.includes(normalize(term)))
+    if (hasDestination && score > (best?.score ?? 0)) best = { section: section.trim(), header, score, index: doc.answer.indexOf(section) }
+  }
+  if (!best) return null
+
+  const parents = [...doc.answer.slice(0, best.index).matchAll(/^#\s+(.+)$/gm)]
+  const parent = parents.at(-1)?.[1]?.trim() ?? ""
+  const prefix = !/(본관|별관|정문|주차장|응급실)/.test(best.header) && /(본관|별관).*층/.test(parent)
+    ? `# ${parent}\n\n`
+    : ""
+  const map = "https://mokdong.eumc.ac.kr/guide/preview.do?floor=1F"
+  return `${prefix}${best.section}${best.section.includes(map) ? "" : `\n\n층별 상세 안내도: ${map}`}`
+}
+
+/**
+ * 이 점수 이상이면 LLM 없이 '답변 가이드'를 그대로 내보낸다.
+ *
+ * 0.62로 보수적으로 잡았다. 근거:
+ *  - 원본 예상질문과 거의 일치하는 질의는 0.70 이상이 나온다(골든셋 297건 전부).
+ *  - 표현이 크게 다른 질의는 0.1~0.6에 흩어지고, 이 구간에서는 정답과 오답이 겹친다
+ *    (실측: 오답 "외래 예약"→신청절차 0.53 vs 정답 "엘리베이터 위치" 0.53).
+ *  - 따라서 이 구간은 직답하지 않고 LLM 판단에 넘긴다. LLM이 없으면 담당자 연결로
+ *    떨어진다 — 틀린 답을 내보내는 것보다 안전하다.
+ */
+/**
+ * KB 직답 임계값.
+ *
+ * 0.62 에서 0.66 으로 인상 (2026-08-24 채널톡 실대화 재생):
+ * "병원에 도착해서 뭘 해야해?" 가 문서 19(외부 이동)의 예상질문
+ * "병원 도착해서만 도와주는 거야?" 와 표면 유사로 0.627 을 받아 엉뚱한 원문이
+ * 그대로 나갔다. 골든 297문항 중 0.62~0.66 구간은 0건이라 직답 커버리지 손실 없이
+ * 이런 표면 유사 오답만 LLM(전체 문서 대조) 쪽으로 넘어간다.
+ */
+export const KB_DIRECT_THRESHOLD = 0.66
+/** 이 점수 미만이면 LLM에게 넘길 후보로도 쓰지 않는다 */
+export const KB_CANDIDATE_THRESHOLD = 0.18

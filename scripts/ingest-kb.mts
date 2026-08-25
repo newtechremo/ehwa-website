@@ -1,0 +1,201 @@
+/**
+ * KB 지식문서(59건) → Supabase kb_documents 적재
+ *
+ * 원본: docs/chatbot-assets/kb_md/NN_카테고리_세부주제.md
+ * 형식: # [카테고리] 세부주제 / ## 예상 질문 (- "...") / ## 답변 가이드
+ *
+ * 실행: npm run kb:ingest            (.env.local 기준 = 로컬 Supabase)
+ *       npm run kb:ingest -- --prod  (운영 Supabase, .env.tokens 필요)
+ */
+import "./load-env.mts"
+import { readFileSync, readdirSync } from "fs"
+import { createHash } from "node:crypto"
+import path from "path"
+import { createClient } from "@supabase/supabase-js"
+import { embedMany } from "ai"
+import { resolveEmbeddingModel } from "../lib/chatbot/model"
+
+const DIR = "docs/chatbot-assets/kb_md"
+
+type Doc = {
+  doc_key: string
+  seq: number
+  category: string
+  topic: string
+  questions: string[]
+  short_answer: string | null
+  answer: string
+  body: string
+}
+
+function parse(file: string): Doc | null {
+  const raw = readFileSync(path.join(DIR, file), "utf8").replace(/\r\n/g, "\n")
+  const base = file.replace(/\.md$/, "")
+
+  const seqMatch = base.match(/^(\d+)_/)
+  if (!seqMatch) return null // 00_AI_INSTRUCTION 등 번호 없는 지침 파일은 제외
+  const seq = Number(seqMatch[1])
+  if (seq === 0) return null
+
+  // 제목: "# [카테고리] 세부주제"
+  const title = raw.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? base
+  const cat = title.match(/^\[(.+?)\]\s*(.*)$/)
+  const category = cat ? cat[1].trim() : "기타"
+  const topic = cat ? cat[2].trim() : title
+
+  // 예상 질문 섹션
+  const qSection = raw.split(/^##\s*예상 질문\s*$/m)[1]?.split(/^##\s/m)[0] ?? ""
+  const questions = [...qSection.matchAll(/^\s*[-*]\s*"?(.+?)"?\s*$/gm)]
+    .map((m) => m[1].trim())
+    // 원본 일부(병원 일반 13건)는 "- (예상 질문 없음)" 플레이스홀더만 있다.
+    // 실제 질문이 아니므로 제외하고, 검색은 제목·본문 소제목으로 처리한다.
+    .filter((q) => q && !/^\(?\s*예상\s*질문\s*없음\s*\)?$/.test(q))
+
+  const shortSection = raw.split(/^##\s*짧은 답변\s*$/m)[1]?.split(/^##\s/m)[0] ?? ""
+  const short_answer = shortSection.trim() || null
+
+  // 답변 가이드 섹션
+  const aSection = raw.split(/^##\s*답변 가이드\s*$/m)[1] ?? ""
+  const answer = aSection.replace(/^#\s+.*\n+/, "").trim()
+
+  if (!answer) return null
+
+  // 예상 질문이 없는 문서를 위해 답변의 소제목을 검색 보조어로 뽑는다
+  if (questions.length === 0) {
+    const heads = [...answer.matchAll(/^#{1,3}\s*(?:[①-⑳0-9.]+\s*)?(.+?)\s*$/gm)]
+      .map((m) => m[1].replace(/[*_`]/g, "").trim())
+      .filter((h) => h.length >= 2 && h.length <= 40)
+    questions.push(topic, ...heads.slice(0, 12))
+  }
+
+  return { doc_key: base, seq, category, topic, questions, short_answer, answer, body: raw.trim() }
+}
+
+const files = readdirSync(DIR).filter((f) => f.endsWith(".md")).sort()
+const docs = files.map(parse).filter((d): d is Doc => d !== null)
+
+console.log(`  파싱: ${docs.length}건 / md ${files.length}개`)
+const noQ = docs.filter((d) => d.questions.length === 0)
+if (noQ.length) console.log(`  ⚠ 예상질문 없는 문서 ${noQ.length}건: ${noQ.map((d) => d.seq).join(", ")}`)
+
+const useProd = process.argv.includes("--prod")
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+if (!url || !key) {
+  console.error("  Supabase 환경변수가 없습니다 (.env.local 확인)")
+  process.exit(1)
+}
+console.log(`  대상: ${useProd ? "운영" : "로컬"} ${url}`)
+
+const hostname = new URL(url).hostname
+const isLocal = hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1"
+if ((useProd && isLocal) || (!useProd && !isLocal)) {
+  console.error(`  대상 불일치: --prod=${useProd}, hostname=${hostname}`)
+  process.exit(1)
+}
+
+const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+
+const { error } = await db.from("kb_documents").upsert(
+  docs.map((d) => ({ ...d, published: true, updated_at: new Date().toISOString() })),
+  { onConflict: "doc_key" },
+)
+if (error) {
+  console.error("  적재 실패:", error.message)
+  process.exit(1)
+}
+
+const { count } = await db.from("kb_documents").select("id", { count: "exact", head: true })
+console.log(`  적재 완료 — kb_documents ${count}건`)
+
+const byCat = docs.reduce<Record<string, number>>((a, d) => ((a[d.category] = (a[d.category] ?? 0) + 1), a), {})
+console.log("  카테고리별:", Object.entries(byCat).map(([k, v]) => `${k} ${v}`).join(" · "))
+console.log(`  예상질문 총 ${docs.reduce((n, d) => n + d.questions.length, 0)}개`)
+
+function splitSections(answer: string): string[] {
+  const sections = answer.split(/(?=^##\s)/m).map((part) => part.trim()).filter(Boolean)
+  return sections.flatMap((section) => {
+    if (section.length <= 1800) return [section]
+    const chunks: string[] = []
+    let current = ""
+    for (const paragraph of section.split(/\n{2,}/)) {
+      if (paragraph.length > 1800) {
+        if (current) chunks.push(current)
+        current = ""
+        for (let start = 0; start < paragraph.length; start += 1800) chunks.push(paragraph.slice(start, start + 1800))
+      } else if (!current || current.length + paragraph.length + 2 <= 1800) {
+        current += `${current ? "\n\n" : ""}${paragraph}`
+      } else {
+        chunks.push(current)
+        current = paragraph
+      }
+    }
+    if (current) chunks.push(current)
+    return chunks
+  })
+}
+
+const model = resolveEmbeddingModel()
+if (!model) {
+  console.log("  embedding 생략 — CHATBOT_EMBEDDING_MODEL/API key 확인")
+  process.exit(0)
+}
+
+const { data: documentRows, error: documentError } = await db.from("kb_documents").select("id, doc_key")
+if (documentError || !documentRows) throw new Error(`문서 ID 조회 실패: ${documentError?.message}`)
+const documentIds = new Map(documentRows.map((row) => [row.doc_key, row.id as number]))
+
+const desired = docs.flatMap((doc) => {
+  const document_id = documentIds.get(doc.doc_key)
+  if (!document_id) throw new Error(`문서 ID 없음: ${doc.doc_key}`)
+  const searchContent = doc.short_answer ?? doc.answer.slice(0, 1800)
+  const sections = [
+    { content: searchContent, embeddingInput: `${doc.topic}\n${doc.questions.join("\n")}\n${searchContent}` },
+    ...splitSections(doc.answer).map((section) => ({ content: section, embeddingInput: `${doc.topic}\n${section}` })),
+  ]
+  return sections.map(({ content: section, embeddingInput }, chunk_index) => ({
+    document_id,
+    chunk_index,
+    content: `${doc.topic}\n${section}`,
+    content_hash: createHash("sha256").update(embeddingInput).digest("hex"),
+    embeddingInput,
+  }))
+})
+
+const { data: existingRows, error: existingError } = await db
+  .from("kb_chunks")
+  .select("document_id, chunk_index, content_hash")
+if (existingError || !existingRows) throw new Error(`기존 chunk 조회 실패: ${existingError?.message}`)
+const existing = new Map(existingRows.map((row) => [`${row.document_id}:${row.chunk_index}`, row.content_hash]))
+const changed = desired.filter((chunk) => existing.get(`${chunk.document_id}:${chunk.chunk_index}`) !== chunk.content_hash)
+
+if (changed.length) {
+  const { embeddings } = await embedMany({
+    model,
+    values: changed.map((chunk) => chunk.embeddingInput),
+    providerOptions: { google: { outputDimensionality: 768, taskType: "RETRIEVAL_DOCUMENT" } },
+  })
+  if (embeddings.length !== changed.length) throw new Error("embedding 응답 수가 chunk 수와 다릅니다")
+  const { error: chunkError } = await db.from("kb_chunks").upsert(
+    changed.map((chunk, index) => ({
+      document_id: chunk.document_id,
+      chunk_index: chunk.chunk_index,
+      content: chunk.content,
+      content_hash: chunk.content_hash,
+      embedding: embeddings[index],
+      updated_at: new Date().toISOString(),
+    })),
+    { onConflict: "document_id,chunk_index" },
+  )
+  if (chunkError) throw new Error(`chunk 적재 실패: ${chunkError.message}`)
+}
+
+for (const [document_id, indexes] of Map.groupBy(desired, (chunk) => chunk.document_id)) {
+  const keep = indexes.map((chunk) => chunk.chunk_index)
+  const { error: deleteError } = await db.from("kb_chunks")
+    .delete()
+    .eq("document_id", document_id)
+    .not("chunk_index", "in", `(${keep.join(",")})`)
+  if (deleteError) throw new Error(`삭제 chunk 정리 실패: ${deleteError.message}`)
+}
+console.log(`  chunk ${desired.length}건 — embedding 호출 대상 ${changed.length}건`)

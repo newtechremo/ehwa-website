@@ -1,0 +1,12 @@
+[
+  { "id": "transport-synonym", "q": "지원되는 교통 서비스는 무엇이 있는가?", "expectAny": [2, 6, 19, 23, 24, 25] },
+  { "id": "home-nursing", "q": "집에서 간호사가 와주는 서비스 신청하고 싶어요", "expectAny": [55] },
+  { "id": "walking", "q": "걷기가 힘든데 팔을 잡아줄 수 있나요?", "expectAny": [24] },
+  { "id": "wayfinding", "q": "병원 길을 못 찾겠는데 계속 같이 다녀주나요?", "expectAny": [25] },
+  { "id": "internal-pharmacy", "q": "진료 끝나고 병원 약국까지 같이 가주시나요?", "expectAny": [19, 32] },
+  { "id": "communication", "q": "말로 설명을 이해하기 어려운데 그림으로 도와주나요?", "expectAny": [28] },
+  { "id": "documents", "q": "보험사에 제출할 서류 작성을 도와주세요", "expectAny": [29, 31] },
+  { "id": "wheelchair", "q": "주차장에서 휠체어로 진료실까지 데려다주세요", "expectAny": [23, 24] },
+  { "id": "late", "q": "예약 시간보다 늦을 것 같아요", "expectAny": [33] },
+  { "id": "toilet", "q": "장애인 화장실 위치가 어디예요?", "expectAny": [43] }
+]
