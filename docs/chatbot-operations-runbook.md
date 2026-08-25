@@ -3,13 +3,15 @@
 ## 현재 전환 상태
 
 - Production은 계속 ChannelTalk을 사용한다.
-- 개선 브랜치 `feat/chatbot-rag-reliability`는 2026-08-24 23:25 KST에 실제 기준 브랜치
-  `feat/chatbot`으로 fast-forward 통합했다. 통합·문서 기록 기준은 `75dc070`, 동작 코드 기준은
-  `64be426`이다.
-- 최신 검증은 offline 전체 PASS, full live 119/119, critical 13/13, 위치 후속 누락 점검
-  4/4, ChannelTalk 실대화 158건, Production build PASS, lint 0 errors/24 warnings다.
-- 최신 기준 브랜치 Preview는 `ehwa-website-e7jk4qp7v-remo-dev.vercel.app`, `Ready`, 보호 적용,
-  `namespace=preview`, 한도 396, KB 59문서·254청크, model/embedding configured 상태다.
+- 개선 브랜치 `feat/chatbot-rag-reliability`는 2026-08-24에 실제 기준 브랜치 `feat/chatbot`으로
+  통합했고, 2026-08-25 Release Candidate는 `7b7f623`이다.
+- 최신 검증은 offline 전체 PASS, critical 17/17, ChannelTalk 실대화 158건, UI·TypeScript·
+  Production build PASS, lint 0 errors/24 기존 warnings다. critical 17건은 모델 호출 0이었다.
+- 최신 기준 브랜치 Preview는 `ehwa-website-2s2h0gb5u-remo-dev.vercel.app`
+  (`dpl_3ryfHmNr4k9t4w7wwFoC32MoNBjS`), `Ready`, 보호 적용, `namespace=preview`, 한도 396,
+  KB 59문서, model/embedding configured 상태다.
+- 이동 보조 신청 smoke는 Preview 서버에서 hybrid RAG로 embedding 1회·generation 1회를 사용했고,
+  신청 시점·환자정보·예약일·방문/온라인/카카오/전화·담당자 확정 문구를 모두 반환했다.
 - 최초 기준 브랜치 배포는 전역 Preview 기본값(`limit=500`, embedding 미설정)을 상속했다. 이후
   `feat/chatbot` 전용 Preview 환경을 개선 브랜치와 동일하게 설정하고 재배포해 드리프트를 해소했다.
 - 실대화 158건 중 fallback 11건은 타 병원·내부 로직·근거 없는 지도/택시 위치·무의미 입력으로
@@ -32,6 +34,9 @@
 Supabase URL/service-role key, `CRON_SECRET`이다. 값은 Git에 저장하지 않는다.
 
 Vercel 환경변수 변경은 기존 배포에 자동 반영되지 않는다. Preview/Production 값을 바꾼 뒤 해당 환경을 다시 배포한다.
+Vercel Sensitive 변수는 생성 후 CLI로 값을 다시 내려받을 수 없다. `vercel env run`으로 Google·
+CRON secret을 검증하지 말고, 변수 이름/scope 확인 후 새 배포의 보호된 health와 실제 서버 RAG
+smoke로 검증한다. `vercel curl`은 Deployment Protection 우회 토큰을 자동 처리한다.
 
 ## 로컬 준비와 KB 적재
 
@@ -58,10 +63,10 @@ npm run chatbot:report -- --day YYYY-MM-DD --namespace qa-local --limit 1000
 ```
 
 - `qa:offline`은 외부 AI 비용이 없다.
-- `qa:critical`은 현재 핵심 질문을 KB에서 직접 답하므로 모델 호출이 0이어야 한다. 현재
-  13/13은 통과했지만 `tests/chatbot-critical-answers.json` 마지막 위치 후속 4건에는 `repeat`가
-  없어 실행기가 건너뛴다. 4건은 별도 Preview 점검에서 4/4 통과했으며, 출시 전 canary 정의를
-  수정해야 한다.
+- `qa:critical`은 현재 핵심 질문을 KB에서 직접 답하므로 모델 호출이 0이어야 한다. 모든 case의
+  양의 정수 `repeat`를 실행 전 검사하며, 로컬과 2026-08-25 Preview에서 17/17 통과했다.
+- 보호된 Preview에서는 `vercel curl`로 임시 bypass cookie를 발급한 뒤 그 Cookie 문자열을
+  `QA_PROTECTION_COOKIE`로 전달한다. 쿠키 파일은 검사 종료 즉시 삭제하고 commit하지 않는다.
 - `qa:full`은 health의 namespace와 최악 비용(`문항 수 × 2`)을 먼저 확인하며 자동 재시도하지 않는다.
 - full 결과는 ignored 경로에 저장된다. `qa:result`는 commit, set SHA-256, 문항/결과 수, 실패 0건을 모두 검사한다.
 - 커밋 후 기존 결과는 즉시 stale이 된다. 현재 commit에서 다시 실행하지 않은 결과를 승인자료로 쓰지 않는다.

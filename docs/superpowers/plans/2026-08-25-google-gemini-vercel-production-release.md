@@ -16,6 +16,8 @@
 - 생성 모델은 `google/gemini-3.5-flash-lite`, 임베딩 모델은 `gemini-embedding-001`로 고정한다.
 - 이번 릴리스에서는 Vercel AI Gateway로 전환하지 않는다. `GOOGLE_GENERATIVE_AI_API_KEY`가 있는 Google 직접 호출 경로를 사용한다.
 - Google 키는 유료 프로젝트에 연결된 Authorization Key를 사용한다. 실제 키 값은 Git·문서·명령 출력에 남기지 않는다.
+- Vercel Sensitive 변수는 생성 후 CLI로 다시 읽을 수 없다. secret의 원격 유효성은 `env run`이
+  아니라 해당 secret이 주입된 새 deployment의 서버 경로로 검증한다.
 - 새 런타임 의존성, 새 Vercel 프로젝트, 별도 staging 인프라를 추가하지 않는다.
 - Preview는 `feat/chatbot`, Production은 `main` Git 배포만 사용한다. 로컬 파일을 `vercel deploy --prod`로 직접 업로드하지 않는다.
 - Preview에서 전체 live QA를 재실행하지 않는다. 로컬 전체 검증 후 Preview에서는 health, critical 17건, 브라우저 검수만 수행한다.
@@ -363,7 +365,9 @@ CHATBOT_LOG_RETAIN_DAYS=90
 
 `GOOGLE_GENERATIVE_AI_API_KEY`는 같은 Preview/`feat/chatbot` scope에 추가하고, Vercel의 secret 입력란에 Step 1에서 확인한 Authorization Key를 붙여넣는다. 문서에는 값을 쓰지 않는다.
 
-Deployment Protection → Protection Bypass for Automation에서 Preview 전용 secret을 생성하고, 동일 값을 `VERCEL_AUTOMATION_BYPASS_SECRET`이라는 Preview/`feat/chatbot` encrypted 환경변수로 등록한다. 기존 `qa-critical.mts`가 이 값을 요청 헤더에만 사용한다.
+Deployment Protection → Protection Bypass for Automation을 활성화한다. Vercel이 deployment에
+`VERCEL_AUTOMATION_BYPASS_SECRET` system variable을 자동 주입하므로 같은 이름의 project env를
+중복 생성하지 않는다. 로컬 자동 QA는 `vercel curl`로 임시 bypass cookie를 발급받는다.
 
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`은 기존 Preview 값을 유지한다.
 
@@ -392,17 +396,21 @@ npx vercel env ls preview feat/chatbot
 npx vercel env ls production
 ```
 
-Expected: 위 변수 이름이 올바른 환경에 표시되고 secret 값은 `Encrypted`로만 출력. 실제 키 값은 출력하지 않는다.
+Expected: 위 변수 이름이 올바른 환경에 표시되고 Sensitive 값은 `Encrypted`로만 출력. 조직의
+Sensitive-by-default 정책에서는 비밀이 아닌 설정도 `Encrypted`일 수 있으므로 정확한 값은 새
+deployment의 health/응답으로 검증한다. 실제 키 값은 출력하지 않는다.
 
-- [ ] **Step 5: Preview secret으로 Google 생성·임베딩을 각각 1회 확인한다**
+- [ ] **Step 5: 로컬 Authorization Key로 Google 생성·임베딩을 각각 1회 확인한다**
 
 Run:
 
 ```bash
-npx vercel env run -e preview --git-branch feat/chatbot -- npx tsx -e 'import { createGoogleGenerativeAI } from "@ai-sdk/google"; import { embed, generateText } from "ai"; (async()=>{const key=process.env.GOOGLE_GENERATIVE_AI_API_KEY; if(!key) throw new Error("GOOGLE_GENERATIVE_AI_API_KEY missing"); const google=createGoogleGenerativeAI({apiKey:key}); const vector=await embed({model:google.embedding("gemini-embedding-001"),value:"이대목동병원 이동 보조",maxRetries:0,providerOptions:{google:{outputDimensionality:768,taskType:"RETRIEVAL_QUERY"}}}); if(vector.embedding.length!==768) throw new Error(`embedding dimensions=${vector.embedding.length}`); const answer=await generateText({model:google("gemini-3.5-flash-lite"),prompt:"반드시 OK 두 글자만 출력하세요.",maxOutputTokens:16,maxRetries:0}); if(!answer.text.includes("OK")) throw new Error("generation smoke failed"); console.log("google-direct smoke: PASS")})().catch(error=>{console.error(error instanceof Error?error.message:String(error));process.exit(1)})'
+node --env-file=.env.local --import tsx --input-type=module -e 'import { createGoogleGenerativeAI } from "@ai-sdk/google"; import { embed, generateText } from "ai"; const key=process.env.GOOGLE_GENERATIVE_AI_API_KEY; if(!key) throw new Error("GOOGLE_GENERATIVE_AI_API_KEY missing"); const google=createGoogleGenerativeAI({apiKey:key}); const vector=await embed({model:google.embedding("gemini-embedding-001"),value:"이대목동병원 이동 보조",maxRetries:0,providerOptions:{google:{outputDimensionality:768,taskType:"RETRIEVAL_QUERY"}}}); if(vector.embedding.length!==768) throw new Error(`embedding dimensions=${vector.embedding.length}`); const answer=await generateText({model:google("gemini-3.5-flash-lite"),prompt:"반드시 OK 두 글자만 출력하세요.",maxOutputTokens:16,maxRetries:0}); if(!answer.text.includes("OK")) throw new Error("generation smoke failed"); console.log("google-direct local smoke: PASS")'
 ```
 
-Expected: `google-direct smoke: PASS`. secret 값과 모델 응답 전문은 출력하지 않는다. 이 검사는 Google provider 호출 2회를 쓰지만 애플리케이션 일일 예산에는 포함되지 않는다.
+Expected: `google-direct local smoke: PASS`. secret 값과 모델 응답 전문은 출력하지 않는다. 이 검사는
+키 자체와 Google 계정 quota만 확인하며, Vercel에 저장된 Sensitive 값은 Task 6의 서버 RAG smoke로
+별도 확인한다. Google provider 호출 2회를 쓰지만 애플리케이션 일일 예산에는 포함되지 않는다.
 
 ---
 
@@ -442,7 +450,9 @@ Expected: target `Preview`, status `Ready`, branch alias `ehwa-website-git-feat-
 Run:
 
 ```bash
-npx vercel env run -e preview --git-branch feat/chatbot -- bash -lc 'npx vercel curl /api/chatbot/health --deployment https://ehwa-website-git-feat-chatbot-remo-dev.vercel.app -- --header "Authorization: Bearer ${CRON_SECRET}"'
+read -rsp "Preview CRON_SECRET: " preview_cron_secret && echo
+npx vercel curl /api/chatbot/health --deployment https://ehwa-website-git-feat-chatbot-remo-dev.vercel.app -- --header "Authorization: Bearer ${preview_cron_secret}"
+unset preview_cron_secret
 ```
 
 Expected JSON:
@@ -464,7 +474,18 @@ Expected JSON:
 Run:
 
 ```bash
-npx vercel env run -e preview --git-branch feat/chatbot -- env QA_BASE=https://ehwa-website-git-feat-chatbot-remo-dev.vercel.app QA_EXPECT_NAMESPACE=preview npm run qa:critical
+cookie_dir=$(mktemp -d /tmp/ehwa-vercel-cookie-XXXXXX)
+cookie_file="$cookie_dir/cookies.txt"
+npx vercel curl / --deployment https://ehwa-website-git-feat-chatbot-remo-dev.vercel.app -- --silent --location --header 'x-vercel-set-bypass-cookie: true' --cookie-jar "$cookie_file" --output /dev/null
+protection_cookie=$(awk 'NF >= 7 && ($1 !~ /^#/ || $1 ~ /^#HttpOnly_/) { printf "%s=%s; ", $6, $7 }' "$cookie_file")
+read -rsp "Preview CRON_SECRET: " preview_cron_secret && echo
+QA_BASE=https://ehwa-website-git-feat-chatbot-remo-dev.vercel.app \
+  QA_EXPECT_NAMESPACE=preview \
+  QA_PROTECTION_COOKIE="$protection_cookie" \
+  CRON_SECRET="$preview_cron_secret" \
+  npm run qa:critical
+unset protection_cookie preview_cron_secret
+case "$cookie_dir" in /tmp/ehwa-vercel-cookie-*) find "$cookie_dir" -depth -delete ;; esac
 ```
 
 Expected: `critical QA: 17/17 PASS`, 모든 case가 허용 source와 답변 contract를 만족하고 model attempts 0.
@@ -477,7 +498,9 @@ Run:
 npx vercel curl /api/chatbot/ask --deployment https://ehwa-website-git-feat-chatbot-remo-dev.vercel.app -- --request POST --header 'Content-Type: application/json' --data '{"question":"검사실·진료실 이동 보조를 받으려면 어떻게 해야 하나요?","sessionId":"preview-release-smoke"}'
 ```
 
-Expected: source `kb`, embedding/generation/model attempts 0, 답변에 `진료 3일 전`, `환자 정보`, `예약일`, `본관 1층`, Walla, 카카오, `02-2650-5586` 포함.
+Expected: source `ai`, `retrievalMethod=hybrid`, embedding 1·generation 1·model 2. 답변에
+`진료 3일 전`, `환자 정보`, `예약일`, `본관 1층`, Walla, 카카오, `02-2650-5586`가 포함된다.
+이 요청이 Vercel에 저장된 Google Sensitive secret의 실제 서버 smoke다.
 
 - [ ] **Step 6: Preview URL·commit·health 결과를 문서에 기록한다**
 
@@ -638,20 +661,27 @@ Expected: Production `READY`, public domain alias 유지, ChannelTalk SDK count 
 Run:
 
 ```bash
-npx vercel env run -e production -- bash -lc 'npx vercel curl /api/chatbot/health --deployment https://barrierfree.eumc.ac.kr -- --header "Authorization: Bearer ${CRON_SECRET}"'
+read -rsp "Production CRON_SECRET: " production_cron_secret && echo
+npx vercel curl /api/chatbot/health --deployment https://barrierfree.eumc.ac.kr -- --header "Authorization: Bearer ${production_cron_secret}"
+unset production_cron_secret
 ```
 
 Expected: namespace `production`, model/embedding configured, KB 59, remaining 500에 근접. 이 단계에서는 질문 API를 호출하지 않는다.
 
-- [ ] **Step 6: Production secret으로 Google 생성·임베딩을 각각 1회 확인한다**
+- [ ] **Step 6: 비활성 Production 서버에서 Google RAG 경로를 1회 확인한다**
 
 Run:
 
 ```bash
-npx vercel env run -e production -- npx tsx -e 'import { createGoogleGenerativeAI } from "@ai-sdk/google"; import { embed, generateText } from "ai"; (async()=>{const key=process.env.GOOGLE_GENERATIVE_AI_API_KEY; if(!key) throw new Error("GOOGLE_GENERATIVE_AI_API_KEY missing"); const google=createGoogleGenerativeAI({apiKey:key}); const vector=await embed({model:google.embedding("gemini-embedding-001"),value:"이대목동병원 이동 보조",maxRetries:0,providerOptions:{google:{outputDimensionality:768,taskType:"RETRIEVAL_QUERY"}}}); if(vector.embedding.length!==768) throw new Error(`embedding dimensions=${vector.embedding.length}`); const answer=await generateText({model:google("gemini-3.5-flash-lite"),prompt:"반드시 OK 두 글자만 출력하세요.",maxOutputTokens:16,maxRetries:0}); if(!answer.text.includes("OK")) throw new Error("generation smoke failed"); console.log("google-direct production smoke: PASS")})().catch(error=>{console.error(error instanceof Error?error.message:String(error));process.exit(1)})'
+npx vercel curl /api/chatbot/ask --deployment https://barrierfree.eumc.ac.kr -- --request POST --header 'Content-Type: application/json' --data '{"question":"검사실·진료실 이동 보조를 받으려면 어떻게 해야 하나요?","sessionId":"production-dark-provider-smoke"}'
+read -rsp "Production CRON_SECRET: " production_cron_secret && echo
+npx vercel curl /api/chatbot/health --deployment https://barrierfree.eumc.ac.kr -- --header "Authorization: Bearer ${production_cron_secret}"
+unset production_cron_secret
 ```
 
-Expected: `google-direct production smoke: PASS`. 실패하면 자체 챗봇 플래그를 켜지 않는다.
+Expected: source `ai`, provider `google-direct`, 승인된 사실 전부 포함, health의 used가 직전보다
+2 증가한다. 자체 위젯은 여전히 OFF이고 ChannelTalk은 ON이다. 실패하면 자체 챗봇
+플래그를 켜지 않는다.
 
 ---
 
