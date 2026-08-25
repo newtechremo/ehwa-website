@@ -4,14 +4,17 @@
 
 - Production은 계속 ChannelTalk을 사용한다.
 - 개선 브랜치 `feat/chatbot-rag-reliability`는 2026-08-24에 실제 기준 브랜치 `feat/chatbot`으로
-  통합했고, 2026-08-25 Release Candidate는 `7b7f623`이다.
+  통합했고, 2026-08-25 Release Candidate는 `75f1829`다.
 - 최신 검증은 offline 전체 PASS, critical 17/17, ChannelTalk 실대화 158건, UI·TypeScript·
   Production build PASS, lint 0 errors/24 기존 warnings다. critical 17건은 모델 호출 0이었다.
-- 최신 기준 브랜치 Preview는 `ehwa-website-2s2h0gb5u-remo-dev.vercel.app`
-  (`dpl_3ryfHmNr4k9t4w7wwFoC32MoNBjS`), `Ready`, 보호 적용, `namespace=preview`, 한도 396,
+- 최신 기준 브랜치 Preview는 `ehwa-website-lhtbp3too-remo-dev.vercel.app`
+  (`dpl_2DWxHu3b3FzPcrK4ZcPJAcFSzuUP`), `Ready`, 보호 적용, `namespace=preview`, 한도 396,
   KB 59문서, model/embedding configured 상태다.
 - 이동 보조 신청 smoke는 Preview 서버에서 hybrid RAG로 embedding 1회·generation 1회를 사용했고,
   신청 시점·환자정보·예약일·방문/온라인/카카오/전화·담당자 확정 문구를 모두 반환했다.
+- Chrome 390×844 자동검사에서 모달 배경 inert·스크롤 잠금, ESC 닫기, 런처 포커스와 기존
+  스크롤 위치 복원, 메시지 시간·하단 AI 안내·가로 넘침 없음이 통과했다. 실제 iPhone/Android와
+  NVDA·VoiceOver·TalkBack 수동 검수는 아직 남아 있다.
 - 최초 기준 브랜치 배포는 전역 Preview 기본값(`limit=500`, embedding 미설정)을 상속했다. 이후
   `feat/chatbot` 전용 Preview 환경을 개선 브랜치와 동일하게 설정하고 재배포해 드리프트를 해소했다.
 - 실대화 158건 중 fallback 11건은 타 병원·내부 로직·근거 없는 지도/택시 위치·무의미 입력으로
