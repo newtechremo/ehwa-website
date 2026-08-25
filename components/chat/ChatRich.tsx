@@ -9,7 +9,7 @@ import type { ReactNode } from "react"
  * 이 콘텐츠는 DB에서 오므로 dangerouslySetInnerHTML을 쓰지 않고 직접 파싱해
  * XSS 경로를 만들지 않는다. 지원 범위를 넘는 마크업은 그대로 글자로 보여준다.
  */
-export function ChatRich({ text }: { text: string }) {
+export function ChatRich({ text, showLinkPreview = false }: { text: string; showLinkPreview?: boolean }) {
   const lines = text.split("\n")
   const out: ReactNode[] = []
   let bullets: string[] = []
@@ -94,7 +94,14 @@ export function ChatRich({ text }: { text: string }) {
   })
   flushBullets("end")
 
-  return <>{out}</>
+  const previewUrl = showLinkPreview ? firstUrl(text) : null
+
+  return (
+    <>
+      {out}
+      {previewUrl ? <LinkPreview url={previewUrl} /> : null}
+    </>
+  )
 }
 
 /** 링크는 http(s)만 허용한다 (javascript: 등 차단) */
@@ -108,8 +115,8 @@ function safeHref(url: string): string | null {
 }
 
 function renderInline(text: string): ReactNode[] {
-  // [텍스트](URL) 과 **굵게** 를 한 번에 분해
-  const parts = text.split(/(\[[^\]]+\]\([^)\s]+\)|\*\*[^*]+\*\*)/g)
+  // [텍스트](URL), 일반 URL, **굵게** 를 한 번에 분해
+  const parts = text.split(/(\[[^\]]+\]\([^)\s]+\)|https?:\/\/[^\s<]+|\*\*[^*]+\*\*)/g)
   return parts.map((p, i) => {
     const link = p.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/)
     if (link) {
@@ -130,9 +137,68 @@ function renderInline(text: string): ReactNode[] {
       }
       return <span key={i}>{link[1]}</span>
     }
+    if (/^https?:\/\//.test(p)) {
+      const href = safeHref(p)
+      if (href) {
+        return (
+          <a
+            key={i}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="break-all font-bold underline underline-offset-2"
+          >
+            {p}
+            <span className="sr-only"> (새 창에서 열림)</span>
+          </a>
+        )
+      }
+    }
     if (p.startsWith("**") && p.endsWith("**") && p.length > 4) {
       return <strong key={i}>{p.slice(2, -2)}</strong>
     }
     return <span key={i}>{p}</span>
   })
+}
+
+function firstUrl(text: string): string | null {
+  const match = text.match(/\[[^\]]+\]\((https?:\/\/[^)\s]+)\)|(https?:\/\/[^\s<]+)/)
+  const url = match?.[1] ?? match?.[2]
+  return url ? safeHref(url) : null
+}
+
+const LINK_META: Record<string, { icon: string; title: string }> = {
+  "walla.my": { icon: "📝", title: "온라인 신청서" },
+  "pf.kakao.com": { icon: "💛", title: "카카오톡 상담" },
+  "mokdong.eumc.ac.kr": { icon: "🏥", title: "이대목동병원 안내" },
+  "www.eumc.ac.kr": { icon: "🏥", title: "이화의료원 안내" },
+  "drive.google.com": { icon: "📄", title: "사전문진표 PDF" },
+  "www.medcerti.co.kr": { icon: "📄", title: "온라인 증명서 발급" },
+}
+
+function LinkPreview({ url }: { url: string }) {
+  const host = new URL(url).hostname
+  const meta = LINK_META[host] ?? { icon: "🔗", title: "링크 열기" }
+
+  return (
+    <a
+      className="chat-link-preview mt-2 flex min-h-[4rem] items-center gap-3 rounded-xl border border-[#dfe5e2] bg-[#f8faf9] p-2.5 no-underline transition-colors hover:border-[#004c28] hover:bg-[#eef5f1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#004c28]"
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <span
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white text-xl shadow-sm"
+        aria-hidden="true"
+      >
+        {meta.icon}
+      </span>
+      <span className="min-w-0 flex-1 text-left">
+        <span className="block truncate font-bold text-[#1a1a1a]">{meta.title}</span>
+        <span className="block truncate text-[0.8125rem] font-normal text-[#666]">{host}</span>
+      </span>
+      <span aria-hidden="true" className="text-[#666]">↗</span>
+      <span className="sr-only"> (새 창에서 열림)</span>
+    </a>
+  )
 }

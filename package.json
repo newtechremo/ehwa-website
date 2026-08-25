@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "start": "next start --port 3112 --hostname 0.0.0.0",
     "test:chatbot": "tsx scripts/chatbot-matrix.mts",
+    "test:chat-ui": "tsx scripts/chat-ui-test.tsx",
     "test:answer-contract": "tsx scripts/answer-contract-test.mts",
     "test:runtime": "tsx scripts/runtime-test.mts",
     "test:budget": "psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f supabase/tests/chatbot_budget.sql",

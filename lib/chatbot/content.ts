@@ -24,7 +24,7 @@ export const WELCOME_MESSAGE =
   "- 점심시간 : 12:00-13:00\n" +
   "- 휴무 : 토요일, 일요일, 공휴일"
 
-export const INPUT_PLACEHOLDER = "궁금한 내용을 입력해주세요 (예 : 서비스 이용일 변경)"
+export const INPUT_PLACEHOLDER = "궁금한 내용을 입력해 주세요"
 
 /** 병원 대표번호 — 편의지원 범위를 벗어난 민원·행정 문의를 넘길 곳 */
 export const HOSPITAL_TEL = "1666-5000"
