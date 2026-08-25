@@ -23,7 +23,9 @@
 - Preview에서 전체 live QA를 재실행하지 않는다. 로컬 전체 검증 후 Preview에서는 health, critical 17건, 브라우저 검수만 수행한다.
 - Production에서는 승인된 synthetic 질문 1건만 호출한다.
 - Production 원문 대화 로그는 기본 비저장한다. 질문·답변 원문 저장이 필요해지면 병원 개인정보 승인 후 별도 릴리스로 다룬다.
-- `NEXT_PUBLIC_CHATBOT_ENABLED=true`는 P0/P1 0건, 접근성 검수, 병원 문구 승인 후에만 Production에 적용한다.
+- `NEXT_PUBLIC_CHATBOT_ENABLED=true`는 P0/P1 0건, 자동 QA, Preview Chrome 검증,
+  Production 다크 배포 통과 후에만 적용한다. 기존 ChannelTalk 전화·URL·신청 문구는
+  2026-08-25 사용자 확정 기준으로 그대로 유지한다.
 - DB rollback으로 테이블이나 데이터를 삭제하지 않는다. 긴급 복구는 챗봇 플래그만 `false`로 되돌린다.
 
 ---
@@ -520,7 +522,7 @@ Expected: 문서 커밋으로 새 Preview가 생기므로, 최종 승인용 URL�
 
 ---
 
-### Task 7: 브라우저·접근성·병원 문구 승인
+### Task 7: 자동 브라우저 검증·기존 ChannelTalk 문구 기준 확정
 
 **Files:**
 - Modify: `tests/chatbot-browser-qa.md`
@@ -529,11 +531,15 @@ Expected: 문서 커밋으로 새 Preview가 생기므로, 최종 승인용 URL�
 
 **Interfaces:**
 - Consumes: 마지막 `feat/chatbot` Preview URL
-- Produces: P0/P1 0건, 접근성 매트릭스 전 셀 판정, 병원 승인자·일시·근거
+- Produces: P0/P1 0건, Preview Chrome 자동 검증, 기존 ChannelTalk 고정 정보 유지 기록
 
-- [ ] **Step 1: 브라우저·화면 매트릭스를 수행한다**
+- [ ] **Step 1: Preview Chrome 자동 검증을 수행한다**
 
-다음 조합을 `tests/chatbot-browser-qa.md`에 PASS/FAIL과 증빙 링크로 기록한다.
+390×844 환경에서 런처, 열기, 메시지 시간, 링크 카드, 입력, 전송, 닫기, 재열기,
+가로 넘침, 배경 inert·스크롤 잠금, ESC, 포커스 복귀, ChannelTalk SDK 미로드를 확인하고
+`tests/chatbot-browser-qa.md`에 기록한다.
+
+다음 전체 조합은 선택적 후속 검수이며 이번 Production 차단 조건으로 사용하지 않는다.
 
 ```text
 Chrome, Edge, Firefox, Safari: 1280×800 / 768×1024 / 390×844
@@ -541,9 +547,7 @@ iOS Safari 실제 iPhone: 세로 / 가로 / 가상 키보드
 Android Chrome 실제 기기: 세로 / 가로 / 가상 키보드
 ```
 
-각 환경에서 런처, 열기, 메시지 시간, 링크 카드, 입력, 전송, 15초 timeout, 닫기, 재열기, 가로 넘침, ChannelTalk SDK 미로드를 확인한다.
-
-- [ ] **Step 2: 키보드·스크린리더를 수행한다**
+- [ ] **Step 2: 키보드·스크린리더 후속 검수 범위를 기록한다**
 
 ```text
 키보드: Tab/Shift+Tab 포커스 순환, Enter 전송, ESC 닫기, 런처 포커스 복귀
@@ -552,11 +556,12 @@ VoiceOver + Safari
 TalkBack + Android Chrome
 ```
 
-Expected: 새 메시지는 한 번만 읽히고, 링크는 목적과 새 창임을 알리며, 챗봇이 열린 동안 배경 페이지로 포커스·스크린리더 탐색·스크롤이 이동하지 않음.
+Expected: 자동 검증 범위와 미실행 수동 범위가 구분되고, 수동 미실행이 이번 릴리스를 차단하지 않음.
 
-- [ ] **Step 3: 병원 담당자가 고정 사실을 확인한다**
+- [ ] **Step 3: 기존 ChannelTalk 고정 사실 유지 결정을 기록한다**
 
-다음 항목을 `tests/chatbot-browser-qa.md`의 최종 승인 아래에 확인자 이름·확인일·근거 링크와 함께 기록한다.
+2026-08-25 사용자가 다음 기존 ChannelTalk 항목을 그대로 유지하도록 확정한 사실을
+`tests/chatbot-browser-qa.md`에 기록한다.
 
 ```text
 진료 3일 전 신청 권장
@@ -571,7 +576,8 @@ AI 한정 데이터 안내 및 담당자 연결 문구
 첨부파일 상담 기능은 이번 릴리스에 포함하지 않는다는 범위
 ```
 
-기존 ChannelTalk 승인 답변과 동일하면 “기존 승인 내용과 동일”로 기록할 수 있다. 구두 확인만 받고 승인자·일시를 비워두지 않는다. 병원이 원문 대화 이력 또는 첨부파일을 필수 기능으로 판단하면 이번 Production 활성화를 중단하고 별도 기능 계획으로 분리한다.
+고정 사실을 변경할 때만 별도 내용 확인을 수행한다. 질문·답변 원문 저장과 첨부파일 상담은
+이번 릴리스 범위에 포함하지 않으며, 실제 필요가 생기면 별도 기능 계획으로 분리한다.
 
 - [ ] **Step 4: 발견한 P0/P1은 한 건씩 수정·재검수한다**
 
@@ -589,7 +595,7 @@ npm run build
 npm run lint
 ```
 
-Expected: 자동 검사 모두 PASS, lint 0 errors, 문서상 P0=0/P1=0, 미실행 접근성 셀=0, 병원 승인자·일시 존재.
+Expected: 자동 검사 모두 PASS, lint 0 errors, 문서상 P0=0/P1=0, 기존 ChannelTalk 고정 정보 유지 결정 존재.
 
 - [ ] **Step 6: 승인 기록을 커밋하고 push한다**
 
@@ -693,7 +699,8 @@ Expected: source `ai`, provider `google-direct`, 승인된 사실 전부 포함,
 - Modify after activation: `docs/채널톡_실대화_비교결과_20260824.md`
 
 **Interfaces:**
-- Consumes: P0/P1 0, 병원 승인, 비활성 Production health PASS
+- Consumes: P0/P1 0, 자동 QA·Preview Chrome 검증, 기존 ChannelTalk 고정 정보 유지 결정,
+  비활성 Production health PASS
 - Produces: `NEXT_PUBLIC_CHATBOT_ENABLED=true` Production과 검증된 rollback 경로
 
 - [ ] **Step 1: 최종 활성화 체크포인트를 확인한다**
@@ -705,9 +712,9 @@ modelConfigured=true
 embeddingConfigured=true
 KB 문서 59
 critical 17/17
-브라우저·실기기·스크린리더 미실행 0
+Preview Chrome 390×844 자동 검증 PASS
 P0/P1 0
-병원 승인자·일시 기록 완료
+기존 ChannelTalk 전화·URL·신청 문구 유지 기록 완료
 CHATBOT_LOG_CONTENT=false
 ```
 

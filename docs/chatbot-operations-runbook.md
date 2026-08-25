@@ -20,8 +20,9 @@
 - 실대화 158건 중 fallback 11건은 타 병원·내부 로직·근거 없는 지도/택시 위치·무의미 입력으로
   모두 보수적 거절이 적절했다. 답변 가능한 질문의 fallback은 0건이다.
 - Git Markdown 재적재 기준 예상질문은 268개이며 Top-1·Top-3 268/268이다.
-- 자체 챗봇은 실제 브라우저·모바일·스크린리더 QA, 병원 문구·링크·전화 승인, 개인정보
-  최소수집 보강 전까지 Production에서 켜지 않는다.
+- 2026-08-25 사용자 결정에 따라 현재 ChannelTalk에서 운영 중인 전화·카카오·Walla URL과
+  신청 문구를 자체 챗봇의 확정 기준으로 그대로 유지한다. 같은 내용을 다시 승인받는 절차와
+  전체 실기기·스크린리더 매트릭스는 Production 차단 조건으로 사용하지 않는다.
 
 ## 환경과 사용량 namespace
 
@@ -121,7 +122,9 @@ select adjust_chatbot_budget(
    worktree에서 `vercel deploy`로 파일을 직접 업로드하지 않는다. 로컬 전용 env symlink가 포함될
    수 있기 때문이다.
 3. 정확한 Preview URL과 Git commit을 기록하고 critical/browser/accessibility QA를 수행한다.
-4. P0/P1 0건과 병원 문구·UI 승인을 받은 뒤에만 `NEXT_PUBLIC_CHATBOT_ENABLED=true`로 전환한다.
+4. 자동 QA·Preview Chrome 검증·Production 다크 배포가 통과하면
+   `NEXT_PUBLIC_CHATBOT_ENABLED=true`로 전환한다. 기존 ChannelTalk 고정 사실을 변경할 때만
+   별도 내용 확인을 수행한다.
 5. 장애 시 즉시 feature flag를 `false`로 되돌리고 재배포해 ChannelTalk으로 복귀한다.
 6. DB migration은 가산형이므로 긴급 rollback에서 테이블을 삭제하지 않는다. 위젯 flag만 되돌린다.
 
