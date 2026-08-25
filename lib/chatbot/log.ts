@@ -28,6 +28,12 @@ export function maskPII(text: string): string {
     .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, "[이메일]")
 }
 
+export function shouldStoreChatContent(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return env.CHATBOT_LOG_CONTENT === "true"
+}
+
 export type ChatLogEntry = {
   requestId?: string | null
   sessionId: string
@@ -63,14 +69,15 @@ export async function logChat(entry: ChatLogEntry): Promise<void> {
   if (!url || !key) return
   try {
     const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+    const storeContent = shouldStoreChatContent()
     await db.from("chatbot_logs").insert({
       request_id: entry.requestId ?? null,
       env: usageNamespace(),
       session_id: entry.sessionId.slice(0, 64) || "unknown",
       kind: entry.kind,
-      user_input: entry.userInput ? maskPII(entry.userInput.slice(0, MAX_INPUT)) : null,
+      user_input: storeContent && entry.userInput ? maskPII(entry.userInput.slice(0, MAX_INPUT)) : null,
       // 답변에도 마스킹을 건다. 이용자가 남긴 연락처를 모델이 되풀이할 수 있다.
-      answer: entry.answer ? maskPII(entry.answer.slice(0, MAX_ANSWER)) : null,
+      answer: storeContent && entry.answer ? maskPII(entry.answer.slice(0, MAX_ANSWER)) : null,
       fallback_reason: entry.fallbackReason ?? null,
       ref_id: entry.refId ? String(entry.refId).slice(0, 64) : null,
       source_doc_ids: entry.sourceDocIds?.length ? entry.sourceDocIds : null,

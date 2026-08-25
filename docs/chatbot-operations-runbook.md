@@ -122,5 +122,7 @@ select adjust_chatbot_budget(
 - ChannelTalk 원본, 메시지, QA/replay 결과는 `docs/chatbot-assets/channeltalk-export/` 밖으로 복사하거나 commit하지 않는다.
 - 파생 질문·답변은 `maskPII()`를 통과시킨다.
 - 대화 로그는 기본 90일 보관 후 보호된 purge cron으로 삭제한다.
-- 현재 `maskPII()`는 주민번호·카드·전화·이메일은 가리지만 이름, 서술형 생년월일, 장애·질환
-  정보는 남을 수 있다. Production 전 최소수집·동의·추가 마스킹 또는 원문 비저장 정책을 승인한다.
+- Preview와 Production은 `CHATBOT_LOG_CONTENT=false`로 질문·답변 원문을 저장하지 않고
+  session·응답 종류·근거 문서·오류·비용 지표만 저장한다. `maskPII()`는 원문 저장을 별도 승인해
+  `true`로 켰을 때의 보조 방어선이며, 이름·서술형 생년월일·장애·질환을 완전히 판별하지 못한다.
+- 원문 상담 이력 기능은 병원 개인정보 승인 전까지 비활성으로 유지한다.
