@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import { BACK_NODE_ID, BOT_NAME, INPUT_PLACEHOLDER, ROOT_NODE_ID } from "@/lib/chatbot/content"
 import { routeFreeText, routeNode, userMessage } from "@/lib/chatbot/engine"
 import type { ChatButton, ChatMessage, LogKind } from "@/lib/chatbot/types"
+import { isolateModalBackground } from "@/lib/chatbot/modal"
 import { ChatActionCard } from "./ChatActionCard"
 import { ChatRich } from "./ChatRich"
 
@@ -137,6 +138,12 @@ export function ChatWidget() {
     document.addEventListener("keydown", onKey, true)
     return () => document.removeEventListener("keydown", onKey, true)
   }, [open, closePanel])
+
+  useEffect(() => {
+    if (!open) return
+    const root = panelRef.current?.closest<HTMLElement>(".chat-widget-root")
+    if (root) return isolateModalBackground(root)
+  }, [open])
 
   const push = useCallback((msg: ChatMessage | ChatMessage[]) => {
     setMessages((prev) => prev.concat(Array.isArray(msg) ? msg.map(withCreatedAt) : withCreatedAt(msg)))
