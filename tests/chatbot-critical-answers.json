@@ -93,6 +93,7 @@
       "id": "replay-emergency-location",
       "question": "응급실 앞",
       "allowedSources": ["kb"],
+      "repeat": 1,
       "expectedAttempts": { "embedding": 0, "generation": 0, "model": 0 },
       "required": [
         { "id": "destination", "all": ["소아청소년과"] },
@@ -104,6 +105,7 @@
       "id": "replay-elevator-emergency",
       "question": "응응 엘베 위주로",
       "allowedSources": ["kb"],
+      "repeat": 1,
       "expectedAttempts": { "embedding": 0, "generation": 0, "model": 0 },
       "required": [
         { "id": "destination", "all": ["소아청소년과"] },
@@ -116,6 +118,7 @@
       "id": "replay-annex-b8",
       "question": "별관B동 8층이에요",
       "allowedSources": ["kb"],
+      "repeat": 1,
       "expectedAttempts": { "embedding": 0, "generation": 0, "model": 0 },
       "required": [
         { "id": "destination", "all": ["소화기내과"] },
@@ -132,6 +135,7 @@
       "id": "replay-elevator-parking",
       "question": "엘베요",
       "allowedSources": ["kb"],
+      "repeat": 1,
       "expectedAttempts": { "embedding": 0, "generation": 0, "model": 0 },
       "required": [
         { "id": "destination", "all": ["소화기내과"] },

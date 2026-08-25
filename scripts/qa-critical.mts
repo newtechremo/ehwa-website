@@ -23,6 +23,11 @@ type CriticalCase = AnswerContract & {
 const suite = JSON.parse(readFileSync("tests/chatbot-critical-answers.json", "utf8")) as {
   cases: CriticalCase[]
 }
+for (const testCase of suite.cases) {
+  if (!Number.isInteger(testCase.repeat) || testCase.repeat < 1) {
+    throw new Error(`critical case has invalid repeat: ${testCase.id}`)
+  }
+}
 const qaSet = JSON.parse(readFileSync("tests/qa-set.json", "utf8")) as {
   kb: Array<{ id: string; history?: Array<{ role: "user" | "assistant"; text: string }> }>
 }
