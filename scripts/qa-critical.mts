@@ -7,9 +7,11 @@ const BASE = process.env.QA_BASE ?? "http://localhost:3113"
 const OUTPUT = "docs/chatbot-assets/channeltalk-export/qa-critical-result.json"
 const EXPECT_NAMESPACE = process.env.QA_EXPECT_NAMESPACE ?? "qa-local"
 const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+const protectionCookie = process.env.QA_PROTECTION_COOKIE
 const requestHeaders: Record<string, string> = {
   "Content-Type": "application/json",
   ...(bypass ? { "x-vercel-protection-bypass": bypass } : {}),
+  ...(protectionCookie ? { Cookie: protectionCookie } : {}),
 }
 
 type CriticalCase = AnswerContract & {
@@ -38,6 +40,7 @@ const health = await fetch(`${BASE}/api/chatbot/health`, {
   headers: {
     Authorization: `Bearer ${process.env.CRON_SECRET ?? ""}`,
     ...(bypass ? { "x-vercel-protection-bypass": bypass } : {}),
+    ...(protectionCookie ? { Cookie: protectionCookie } : {}),
   },
   signal: AbortSignal.timeout(15_000),
 }).then(async (response) => ({ ok: response.ok, status: response.status, body: await response.json().catch(() => ({})) }))
