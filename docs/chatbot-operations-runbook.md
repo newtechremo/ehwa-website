@@ -2,9 +2,9 @@
 
 ## 현재 전환 상태
 
-- Production은 계속 ChannelTalk을 사용한다.
-- 개선 브랜치 `feat/chatbot-rag-reliability`는 2026-08-24에 실제 기준 브랜치 `feat/chatbot`으로
-  통합했고, 2026-08-25 Release Candidate는 `75f1829`다.
+- Production은 2026-08-25 19:25 KST부터 자체 챗봇을 사용한다. ChannelTalk SDK는 비활성화됐다.
+- 개선 브랜치 `feat/chatbot-rag-reliability`를 `feat/chatbot`에 통합한 뒤 PR #1로 `main`에
+  병합했다. Production 기준 merge commit은 `8fa33046a5f290fd17a52add97b63a78ef2af81f`다.
 - 최신 검증은 offline 전체 PASS, critical 17/17, ChannelTalk 실대화 158건, UI·TypeScript·
   Production build PASS, lint 0 errors/24 기존 warnings다. critical 17건은 모델 호출 0이었다.
 - 최신 기준 브랜치 Preview는 `ehwa-website-lhtbp3too-remo-dev.vercel.app`
@@ -23,6 +23,24 @@
 - 2026-08-25 사용자 결정에 따라 현재 ChannelTalk에서 운영 중인 전화·카카오·Walla URL과
   신청 문구를 자체 챗봇의 확정 기준으로 그대로 유지한다. 같은 내용을 다시 승인받는 절차와
   전체 실기기·스크린리더 매트릭스는 Production 차단 조건으로 사용하지 않는다.
+
+## Production 배포 기록 (2026-08-25)
+
+| 단계 | 배포·결과 |
+|---|---|
+| Git 통합 | PR #1, merge commit `8fa3304` |
+| 다크 배포 | `dpl_9vPyfXY4WsaXyaFij1p6ZcDt2omj`, 플래그 OFF, READY |
+| 다크 RAG | 이동 보조 신청 질문 HTTP 200, `ai/google-direct`, 고정 사실 8/8 |
+| 활성 배포 | `dpl_21mh5pzp8aREuwdK4K4RhCqs3ZBz`, 플래그 ON, READY |
+| 공개 URL | https://barrierfree.eumc.ac.kr |
+| 단일 위젯 | ChannelTalk SDK 0, 자체 `chat-widget-root` 1 |
+| Chrome 390×844 | 패널·제목·하단 AI 안내·배경 스크롤 잠금·가로 넘침 없음 PASS |
+| 활성 canary | 전화번호 질문 HTTP 200, `ai/google-direct`, `02-2650-5586` 포함 |
+| 로그 정책 | `CHATBOT_LOG_CONTENT=false`, 원문 비저장 |
+
+Production의 기존 `CRON_SECRET`은 로컬 Preview 값과 달라 로컬 키로 health를 조회하면 401이
+정상 반환된다. 기존 Production secret은 덮어쓰지 않았고, 무인증 health의 401 인증 차단과 실제
+RAG의 Google 직접 호출 성공으로 런타임을 검증했다.
 
 ## 환경과 사용량 namespace
 
@@ -127,6 +145,10 @@ select adjust_chatbot_budget(
    별도 내용 확인을 수행한다.
 5. 장애 시 즉시 feature flag를 `false`로 되돌리고 재배포해 ChannelTalk으로 복귀한다.
 6. DB migration은 가산형이므로 긴급 rollback에서 테이블을 삭제하지 않는다. 위젯 flag만 되돌린다.
+
+현재 활성 배포의 즉시 rollback은 Vercel Production
+`NEXT_PUBLIC_CHATBOT_ENABLED=false` 설정 후 `dpl_21mh5pzp8aREuwdK4K4RhCqs3ZBz`를
+Production으로 redeploy하는 것이다.
 
 ## 개인정보와 이력
 

@@ -10,6 +10,11 @@
 
 **Spec:** `docs/chatbot-operations-runbook.md`, `docs/채널톡_실대화_비교결과_20260824.md`, `tests/chatbot-browser-qa.md`
 
+**Execution result (2026-08-25 19:27 KST):** PR #1을 `main`에 병합했고(`8fa3304`),
+Production 다크 배포 `dpl_9vPyfXY4WsaXyaFij1p6ZcDt2omj`의 Google 직접 RAG를 검증한 뒤
+`dpl_21mh5pzp8aREuwdK4K4RhCqs3ZBz`로 자체 챗봇을 활성화했다. 공개 URL은
+https://barrierfree.eumc.ac.kr 이며 ChannelTalk SDK 0·자체 위젯 1이다.
+
 ## Global Constraints
 
 - 실행 방식은 기존 사용자 지시에 따라 **Inline Execution**으로 한다. 실행 시 `superpowers:executing-plans`를 사용한다.

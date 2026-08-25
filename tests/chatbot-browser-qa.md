@@ -7,6 +7,9 @@
 - Vercel deployment: `dpl_2DWxHu3b3FzPcrK4ZcPJAcFSzuUP`, `READY`
 - 자동 검증일/KST: 2026-08-25
 - 수동 수행자: 미지정
+- Production URL: https://barrierfree.eumc.ac.kr
+- Production commit/deployment: `8fa3304`, `dpl_21mh5pzp8aREuwdK4K4RhCqs3ZBz`, `READY`
+- Production 활성화 검증/KST: 2026-08-25 19:27
 - 채널톡 비교 기준: 4개 상태 28건·620메시지·158 자유질문 전체 replay. 결과는
   `docs/채널톡_실대화_비교결과_20260824.md` 참조
 
@@ -25,6 +28,11 @@
 | Chrome 390×844 자동 상호작용 | 제목·구문구 제거·시간·하단 안내·가로 넘침·배경 inert/스크롤 잠금·ESC·포커스/스크롤 복원 ✓ |
 | 전체 ChannelTalk replay | 158/158 실행 ✓ |
 | replay 내용 coverage | fallback 11건 모두 범위 밖·근거 부족, 답변 가능 fallback 0건 ✓ |
+| Production 다크 RAG | 이동 보조 질문 `ai/google-direct`, 필수 사실 8/8 ✓ |
+| Production 단일 위젯 | ChannelTalk SDK 0·자체 위젯 1 ✓ |
+| Production Chrome 390×844 | 패널·제목·하단 안내·배경 스크롤 잠금·가로 넘침 없음 ✓ |
+| Production 활성 canary | HTTP 200, `ai/google-direct`, 공식 전화번호 포함 ✓ |
+| health 인증 경계 | 무인증·로컬 Preview secret 요청 401, 기존 Production secret 보존 ✓ |
 
 ## 선택적 후속 수동 검수 매트릭스 (Production 차단 조건 아님)
 
@@ -55,4 +63,4 @@
 - 운영 내용 기준: 2026-08-25 사용자 확정 — 기존 ChannelTalk 공식 전화·URL·신청 문구를 그대로 유지
 - 별도 병원 재승인: 동일한 운영 내용을 유지하므로 불필요. 고정 사실 변경 시에만 다시 확인
 - 전체 실기기·스크린리더 매트릭스: 선택적 후속 검수이며 이번 Production 차단 조건이 아님
-- 출시 판정: **기술 게이트 통과 — Production 다크 배포 및 활성화 진행 가능**
+- 출시 판정: **Production 활성화·기술 검증 완료**
