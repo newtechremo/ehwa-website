@@ -1,5 +1,11 @@
 # ChannelTalk Replacement Release Implementation Plan
 
+> **실행 상태 (2026-09-07 확인):** 이 문서의 체크박스는 실행 당시 갱신되지 않았다.
+> 계획된 작업은 실제로 수행돼 `main`에 반영됐고 Production 이 운영 중이다.
+> 체크박스를 진행 현황의 근거로 쓰지 말 것. 권위 있는 현황은 아래 문서를 본다.
+> - 현황·검증 수치: `docs/자체챗봇_Production_배포_및_현재진행현황_20260825.md`
+> - 운영 절차: `docs/chatbot-operations-runbook.md`
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 자체 챗봇의 오답·운영 안전성·배포 격차를 해소하고, 채널톡 대화 이력을 기준으로 검수한 뒤 `barrierfree.eumc.ac.kr`을 무중단 전환한다.

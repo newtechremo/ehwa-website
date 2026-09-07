@@ -1,5 +1,11 @@
 # 자체 챗봇 RAG 신뢰성 개선 Implementation Plan
 
+> **실행 상태 (2026-09-07 확인):** 이 문서의 체크박스는 실행 당시 갱신되지 않았다.
+> 계획된 작업은 실제로 수행돼 `main`에 반영됐고 Production 이 운영 중이다.
+> 체크박스를 진행 현황의 근거로 쓰지 말 것. 권위 있는 현황은 아래 문서를 본다.
+> - 현황·검증 수치: `docs/자체챗봇_Production_배포_및_현재진행현황_20260825.md`
+> - 운영 절차: `docs/chatbot-operations-runbook.md`
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** agent QA가 사용자 예산을 소진하지 않고, 핵심 병원 업무 질문은 필수 사실을 빠짐없이 답하며, 나머지 질문은 작은 근거 집합만 사용하는 하이브리드 RAG로 처리하고 실제 답변 전체를 기준으로 출시 여부를 판정한다.

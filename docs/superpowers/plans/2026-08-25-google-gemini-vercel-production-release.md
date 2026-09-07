@@ -1,5 +1,11 @@
 # Google Gemini 직접 연결 기반 Vercel 배포 Implementation Plan
 
+> **실행 상태 (2026-09-07 확인):** 이 문서의 체크박스는 실행 당시 갱신되지 않았다.
+> 계획된 작업은 실제로 수행돼 `main`에 반영됐고 Production 이 운영 중이다.
+> 체크박스를 진행 현황의 근거로 쓰지 말 것. 권위 있는 현황은 아래 문서를 본다.
+> - 현황·검증 수치: `docs/자체챗봇_Production_배포_및_현재진행현황_20260825.md`
+> - 운영 절차: `docs/chatbot-operations-runbook.md`
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 검증된 Google Gemini 직접 연결 구성으로 최신 자체 챗봇을 Vercel Preview에서 검수한 뒤, ChannelTalk을 유지하는 Production 배포를 거쳐 안전하게 자체 챗봇으로 전환한다.
