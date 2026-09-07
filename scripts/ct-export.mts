@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { pathToFileURL } from "node:url"
 import { maskPII } from "../lib/chatbot/log"
 
@@ -105,6 +105,69 @@ async function main() {
     })
   })
 
+  // 구독 해지 시 함께 사라지는 채널 메타데이터. 대화만으로는 복원할 수 없다.
+  // users 는 상담 상대(대부분 익명 방문자)이며 이메일·전화가 담길 수 있으므로
+  // 이 폴더 전체가 git 추적 제외라는 전제 위에서만 보관한다.
+  const sidecars: Record<string, unknown> = {}
+  for (const state of STATES) {
+    const url = new URL(`${API}/user-chats`)
+    url.search = new URLSearchParams({ sortOrder: "asc", limit: String(LIMIT), state }).toString()
+    const response = await fetch(url, { headers: headers() })
+    if (!response.ok) throw new Error(`sidecar fetch failed: ${state} ${response.status}`)
+    const body = await response.json() as Record<string, unknown>
+    for (const field of ["users", "managers", "chatTags"]) {
+      const rows = body[field]
+      if (!Array.isArray(rows)) continue
+      const bucket = (sidecars[field] as Record<string, unknown>[] | undefined) ?? []
+      const ids = new Set(bucket.map((row) => (row as { id?: string }).id))
+      for (const row of rows as Record<string, unknown>[]) {
+        if (!ids.has(row.id as string)) bucket.push(row)
+      }
+      sidecars[field] = bucket
+    }
+  }
+  for (const [path, field] of [["/managers", "managers"], ["/groups", "groups"]] as const) {
+    const response = await fetch(new URL(`${API}${path}`), { headers: headers() })
+    if (!response.ok) continue
+    const body = await response.json() as Record<string, unknown>
+    if (Array.isArray(body[field])) sidecars[`channel_${field}`] = body[field]
+  }
+  const channelResponse = await fetch(new URL(`${API}/channel`), { headers: headers() })
+  if (channelResponse.ok) sidecars.channel = ((await channelResponse.json()) as Record<string, unknown>).channel
+
+  // 첨부파일은 채널톡 스토리지에 있어 해지 후 접근 불가. 원본을 로컬로 내려받는다.
+  const attachments: Array<Record<string, unknown>> = []
+  for (const [chatId, rows] of Object.entries(messages)) {
+    for (const message of rows) {
+      for (const file of ((message.files as Record<string, unknown>[] | undefined) ?? [])) {
+        attachments.push({ chatId, messageId: message.id, ...file })
+      }
+    }
+  }
+  if (attachments.length) {
+    mkdirSync(`${OUTPUT}/attachments`, { recursive: true })
+    for (const file of attachments) {
+      const target = `${OUTPUT}/attachments/${file.id}_${String(file.name).replace(/[/\\]/g, "_")}`
+      if (existsSync(target)) { file.savedAs = target; continue }
+      const direct = typeof file.url === "string" ? file.url : null
+      const bucketUrl = file.bucket && file.key ? `https://${file.bucket}/${file.key}` : null
+      let saved = false
+      for (const candidate of [direct, bucketUrl].filter(Boolean) as string[]) {
+        try {
+          const response = await fetch(candidate, { headers: headers() })
+          if (!response.ok) continue
+          writeFileSync(target, Buffer.from(await response.arrayBuffer()))
+          file.savedAs = target
+          saved = true
+          break
+        } catch { /* 다음 후보 */ }
+      }
+      // 내려받지 못한 첨부는 조용히 넘기지 않는다. 해지 전에 사람이 데스크에서 받아야 한다.
+      if (!saved) file.savedAs = null
+    }
+    writeFileSync(`${OUTPUT}/attachments.json`, JSON.stringify(attachments, null, 2))
+  }
+
   const times = [...chats, ...Object.values(messages).flat()]
     .map((row) => row.createdAt)
     .filter((value): value is number => typeof value === "number" && Number.isFinite(value))
@@ -118,6 +181,11 @@ async function main() {
       chatPages: Object.values(byState).reduce((sum, state) => sum + state.pages, 0),
       messagePages,
       qaPairs: qaPairs.length,
+      users: ((sidecars.users as unknown[]) ?? []).length,
+      managers: ((sidecars.channel_managers as unknown[]) ?? []).length,
+      groups: ((sidecars.channel_groups as unknown[]) ?? []).length,
+      attachments: attachments.length,
+      attachmentsSaved: attachments.filter((file) => file.savedAs).length,
     },
     firstAt: iso(times.length ? Math.min(...times) : undefined),
     lastAt: iso(times.length ? Math.max(...times) : undefined),
@@ -128,6 +196,7 @@ async function main() {
   writeFileSync(`${OUTPUT}/user-chats.json`, JSON.stringify(chats, null, 2))
   writeFileSync(`${OUTPUT}/messages.json`, JSON.stringify(messages, null, 2))
   writeFileSync(`${OUTPUT}/qa-pairs.json`, JSON.stringify(qaPairs, null, 2))
+  writeFileSync(`${OUTPUT}/channel-metadata.json`, JSON.stringify(sidecars, null, 2))
   writeFileSync(`${OUTPUT}/manifest.json`, JSON.stringify(manifest, null, 2))
   console.log(JSON.stringify(manifest, null, 2))
 }
